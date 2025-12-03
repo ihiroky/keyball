@@ -74,9 +74,9 @@ void oledkit_render_info_user(void) {
 
 const uint16_t PROGMEM esc_combo[] = {KC_Q, KC_F, COMBO_END};
 const uint16_t PROGMEM tab_combo[] = {KC_A, KC_F, COMBO_END};
-const uint16_t PROGMEM del_combo[] = {KC_P, KC_J, COMBO_END};
-const uint16_t PROGMEM bsp_combo[] = {KC_O, KC_J, COMBO_END};
-const uint16_t PROGMEM spc_combo[] = {KC_ENTER, KC_J, COMBO_END};
+const uint16_t PROGMEM del_combo[] = {KC_ENTER, KC_J, COMBO_END};
+const uint16_t PROGMEM bsp_combo[] = {KC_L, KC_J, COMBO_END};
+const uint16_t PROGMEM spc_combo[] = {KC_K, KC_J, COMBO_END};
 
 
 combo_t key_combos[] = {
