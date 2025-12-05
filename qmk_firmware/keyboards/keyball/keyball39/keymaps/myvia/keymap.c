@@ -88,3 +88,18 @@ combo_t key_combos[] = {
 };
 
 #endif
+
+#ifdef TAP_DANCE_ENABLE
+
+enum {
+    TD_QUOT_DQUO,
+    TD_PIPE_TILD,
+};
+
+tap_dance_action_t tap_dance_actions[] = {
+    // Japanese keyboard specific characters
+    [TD_QUOT_DQUO] = ACTION_TAP_DANCE_DOUBLE(S(KC_7), S(KC_2)),
+    [TD_PIPE_TILD] = ACTION_TAP_DANCE_DOUBLE(S(KC_INTERNATIONAL_3), S(KC_EQUAL)),
+};
+
+#endif
