@@ -24,6 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define AUTO_SHIFT_TIMEOUT 180
 #define NO_ACTION_ONESHOT
 
+// Prevent `quantum\keyboard.c` from calling oled_on().
+// Self housekeeping is required to handle oled timeout.
+#define OLED_TIMEOUT 0
+
 #define TAP_CODE_DELAY 5
 
 #define POINTING_DEVICE_AUTO_MOUSE_ENABLE
