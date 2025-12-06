@@ -51,6 +51,8 @@ keyball_t keyball = {
     .scroll_mode = false,
     .scroll_div  = 0,
 
+    .oled_on = false,
+
     .pressing_keys = { BL, BL, BL, BL, BL, BL, 0 },
 };
 
@@ -511,6 +513,16 @@ void keyball_oled_render_layerinfo(void) {
 #endif
 }
 
+void keyball_oled_onoff(void) {
+#ifdef OLED_ENABLE
+    if (keyball.oled_on) {
+        oled_on();
+    } else {
+        oled_off();
+        oled_clear();
+    }
+#endif
+}
 //////////////////////////////////////////////////////////////////////////////
 // Public API functions
 
@@ -586,6 +598,10 @@ void keyboard_post_init_kb(void) {
 #endif
 #if KEYBALL_SCROLLSNAP_ENABLE == 2
         keyball_set_scrollsnap_mode(c.ssnap);
+#endif
+#ifdef OLED_ENABLE
+        keyball.oled_on = c.oled ? true : false;
+        keyball_oled_onoff();
 #endif
     }
 
@@ -692,6 +708,9 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
 #if KEYBALL_SCROLLSNAP_ENABLE == 2
                     .ssnap = keyball_get_scrollsnap_mode(),
 #endif
+#ifdef OLED_ENABLE
+                    .oled  = keyball.oled_on ? 1 : 0,
+#endif
                 };
                 eeconfig_update_kb(c.raw);
             } break;
@@ -746,6 +765,13 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
                     uint16_t v = get_auto_mouse_timeout() - 50;
                     set_auto_mouse_timeout(MAX(v, AML_TIMEOUT_MIN));
                 }
+                break;
+#endif
+
+#ifdef OLED_ENABLE
+            case OLED_TOGGLE:
+                keyball.oled_on = !keyball.oled_on;
+                keyball_oled_onoff();
                 break;
 #endif
 

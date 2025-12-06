@@ -115,6 +115,8 @@ enum keyball_keycodes {
     AML_I50  = QK_KB_11, // Increment automatic mouse layer timeout
     AML_D50  = QK_KB_12, // Decrement automatic mouse layer timeout
 
+    OLED_TOGGLE = QK_KB_16, // Toggle OLED on/off
+
     // User customizable 32 keycodes.
     KEYBALL_SAFE_RANGE = QK_USER_0,
 };
@@ -130,6 +132,9 @@ typedef union {
 #endif
 #if KEYBALL_SCROLLSNAP_ENABLE == 2
         uint8_t ssnap : 2; // scroll snap mode
+#endif
+#ifdef OLED_ENABLE
+        uint8_t oled : 1;  // OLED on/off
 #endif
     };
 } keyball_config_t;
@@ -176,6 +181,10 @@ typedef struct {
     uint16_t       last_kc;
     keypos_t       last_pos;
     report_mouse_t last_mouse;
+
+#ifdef OLED_ENABLE
+    bool oled_on;
+#endif
 
     // Buffer to indicate pressing keys.
     char pressing_keys[KEYBALL_OLED_MAX_PRESSING_KEYCODES + 1];

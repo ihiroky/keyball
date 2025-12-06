@@ -64,9 +64,27 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 #    include "lib/oledkit/oledkit.h"
 
 void oledkit_render_info_user(void) {
+    if (!keyball.oled_on) {
+        return;
+    }
     keyball_oled_render_keyinfo();
     keyball_oled_render_ballinfo();
     keyball_oled_render_layerinfo();
+}
+
+void oledkit_render_logo_user(void) {
+    if (!keyball.oled_on) {
+        return;
+    }
+    // Require `OLED_FONT_H "keyboards/keyball/lib/logofont/logofont.c"`
+    char ch = 0x80;
+    for (int y = 0; y < 3; y++) {
+        oled_write_P(PSTR("  "), false);
+        for (int x = 0; x < 16; x++) {
+            oled_write_char(ch++, false);
+        }
+        oled_advance_page(false);
+    }
 }
 #endif
 
