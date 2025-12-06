@@ -135,7 +135,6 @@ typedef union {
         uint8_t ssnap : 2; // scroll snap mode
 #endif
 #ifdef OLED_ENABLE
-        uint8_t oled : 1;  // OLED on/off
         uint8_t oledinv : 1; //  OLED inversion
 #endif
     };
@@ -186,6 +185,7 @@ typedef struct {
 
 #ifdef OLED_ENABLE
     bool oled_on;
+    uint32_t oled_timer;
     bool oled_inversion;
 #endif
 

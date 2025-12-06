@@ -511,12 +511,16 @@ void keyball_oled_render_layerinfo(void) {
 #endif
 }
 
-void keyball_oled_onoff(void) {
+void keyball_oled_on(bool on) {
 #ifdef OLED_ENABLE
-    if (keyball.oled_on) {
+    if (on && !keyball.oled_on) {
         oled_on();
+        keyball.oled_on = true;
+        keyball.oled_timer = timer_read32();
     } else {
         oled_off();
+        keyball.oled_on = false;
+        keyball.oled_timer = 0;
     }
 #endif
 }
@@ -606,13 +610,15 @@ void keyboard_post_init_kb(void) {
         keyball_set_scrollsnap_mode(c.ssnap);
 #endif
 #ifdef OLED_ENABLE
-        keyball.oled_on = c.oled ? true : false;
-        keyball_oled_onoff();
         keyball.oled_inversion = c.oledinv ? true : false;
         oled_invert(keyball.oled_inversion);
 #endif
     }
 
+#ifdef OLED_ENABLE
+    // turn on OLED on startup.
+    keyball_oled_on(true);
+#endif
     keyball_on_adjust_layout(KEYBALL_ADJUST_PENDING);
     keyboard_post_init_user();
 }
@@ -625,6 +631,14 @@ void housekeeping_task_kb(void) {
             rpc_get_motion_invoke();
             rpc_set_cpi_invoke();
         }
+#ifdef OLED_ENABLE
+        if (keyball.oled_on) {
+            bool should_oled_on = (timer_elapsed32(keyball.oled_timer) <= KEYBALL_OLED_TIMEOUT);
+            if (!should_oled_on && is_oled_on()) {
+                keyball_oled_on(false);
+            }
+        }
+#endif
     }
 }
 #endif
@@ -717,7 +731,6 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
                     .ssnap = keyball_get_scrollsnap_mode(),
 #endif
 #ifdef OLED_ENABLE
-                    .oled  = keyball.oled_on ? 1 : 0,
                     .oledinv = keyball.oled_inversion ? 1 : 0,
 #endif
                 };
@@ -779,8 +792,7 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
 
 #ifdef OLED_ENABLE
             case OLED_TOGGLE:
-                keyball.oled_on = !keyball.oled_on;
-                keyball_oled_onoff();
+                keyball_oled_on(!keyball.oled_on);
                 break;
             case OLED_TOGGLE_INVERT:
                 // Sync maybe needed if both sides get inverted.
