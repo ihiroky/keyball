@@ -73,6 +73,7 @@ void oledkit_render_info_user(void) {
 }
 
 void oledkit_render_logo_user(void) {
+    // Render Keyball logo only if oled is on before initialization.
     if (!keyball.oled_on) {
         return;
     }
@@ -86,6 +87,7 @@ void oledkit_render_logo_user(void) {
         oled_advance_page(false);
     }
 }
+
 #endif
 
 #ifdef COMBO_ENABLE

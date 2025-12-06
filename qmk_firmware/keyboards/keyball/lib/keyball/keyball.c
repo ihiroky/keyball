@@ -51,8 +51,6 @@ keyball_t keyball = {
     .scroll_mode = false,
     .scroll_div  = 0,
 
-    .oled_on = false,
-
     .pressing_keys = { BL, BL, BL, BL, BL, BL, 0 },
 };
 
@@ -602,6 +600,8 @@ void keyboard_post_init_kb(void) {
 #ifdef OLED_ENABLE
         keyball.oled_on = c.oled ? true : false;
         keyball_oled_onoff();
+        keyball.oled_inversion = c.oledinv ? true : false;
+        oled_invert(keyball.oled_inversion);
 #endif
     }
 
@@ -710,6 +710,7 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
 #endif
 #ifdef OLED_ENABLE
                     .oled  = keyball.oled_on ? 1 : 0,
+                    .oledinv = keyball.oled_inversion ? 1 : 0,
 #endif
                 };
                 eeconfig_update_kb(c.raw);
@@ -772,6 +773,10 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
             case OLED_TOGGLE:
                 keyball.oled_on = !keyball.oled_on;
                 keyball_oled_onoff();
+                break;
+            case OLED_TOGGLE_INVERT:
+                keyball.oled_inversion = !keyball.oled_inversion;
+                oled_invert(keyball.oled_inversion);
                 break;
 #endif
 

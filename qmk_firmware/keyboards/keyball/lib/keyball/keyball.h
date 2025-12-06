@@ -116,6 +116,7 @@ enum keyball_keycodes {
     AML_D50  = QK_KB_12, // Decrement automatic mouse layer timeout
 
     OLED_TOGGLE = QK_KB_16, // Toggle OLED on/off
+    OLED_TOGGLE_INVERT = QK_KB_17, // Invert OLED display
 
     // User customizable 32 keycodes.
     KEYBALL_SAFE_RANGE = QK_USER_0,
@@ -135,6 +136,7 @@ typedef union {
 #endif
 #ifdef OLED_ENABLE
         uint8_t oled : 1;  // OLED on/off
+        uint8_t oledinv : 1; //  OLED inversion
 #endif
     };
 } keyball_config_t;
@@ -184,6 +186,7 @@ typedef struct {
 
 #ifdef OLED_ENABLE
     bool oled_on;
+    bool oled_inversion;
 #endif
 
     // Buffer to indicate pressing keys.
