@@ -236,6 +236,9 @@ void keyball_oled_render_keyinfo(void);
 /// inactive layers.
 void keyball_oled_render_layerinfo(void);
 
+/// keyball_is_oled_on tells whether OLED is on or off.
+bool keyball_is_oled_on(void);
+
 /// keyball_get_scroll_mode gets current scroll mode.
 bool keyball_get_scroll_mode(void);
 

@@ -64,7 +64,7 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 #    include "lib/oledkit/oledkit.h"
 
 void oledkit_render_info_user(void) {
-    if (!keyball.oled_on) {
+    if (!keyball_is_oled_on()) {
         return;
     }
     keyball_oled_render_keyinfo();
@@ -73,8 +73,7 @@ void oledkit_render_info_user(void) {
 }
 
 void oledkit_render_logo_user(void) {
-    // Render Keyball logo only if oled is on before initialization.
-    if (!keyball.oled_on) {
+    if (!keyball_is_oled_on()) {
         return;
     }
     // Require `OLED_FONT_H "keyboards/keyball/lib/logofont/logofont.c"`

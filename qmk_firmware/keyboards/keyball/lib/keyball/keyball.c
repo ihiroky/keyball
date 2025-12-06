@@ -517,8 +517,16 @@ void keyball_oled_onoff(void) {
         oled_on();
     } else {
         oled_off();
-        oled_clear();
     }
+#endif
+}
+
+bool keyball_is_oled_on() {
+#ifdef OLED_ENABLE
+    if (is_keyboard_master()){
+        return keyball.oled_on;
+    }
+    return is_oled_on();
 #endif
 }
 //////////////////////////////////////////////////////////////////////////////
@@ -775,6 +783,8 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
                 keyball_oled_onoff();
                 break;
             case OLED_TOGGLE_INVERT:
+                // Sync maybe needed if both sides get inverted.
+                // https://www.reddit.com/r/olkb/comments/1033bz0/comment/j2zs4xe/?tl=ja
                 keyball.oled_inversion = !keyball.oled_inversion;
                 oled_invert(keyball.oled_inversion);
                 break;
