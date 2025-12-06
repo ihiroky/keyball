@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // Prevent `quantum\keyboard.c` from calling oled_on().
 // Self housekeeping is required to handle oled timeout.
 #define OLED_TIMEOUT 0
+#define KEYBALL_OLED_TIMEOUT 10000
 
 #define TAP_CODE_DELAY 5
 
