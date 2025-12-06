@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define TAPPING_TERM 180
 #define AUTO_SHIFT_TIMEOUT 180
+#define AUTO_SHIFT_REPEAT
 #define NO_ACTION_ONESHOT
 
 // Prevent `quantum\keyboard.c` from calling oled_on().
