@@ -373,6 +373,24 @@ static void rpc_set_cpi_invoke(void) {
     keyball.cpi_changed = false;
 }
 
+#ifdef OLED_ENABLE
+static void rpc_set_oled_invert_handler(uint8_t in_buflen, const void *in_data, uint8_t out_buflen, void *out_data) {
+    bool oled_inversion = *(bool *)in_data;
+    keyball.oled_inversion = oled_inversion;
+}
+
+static void rpc_set_oled_invert_invoke(void) {
+    if (!keyball.oled_inversion_changed) {
+        return;
+    }
+    bool req = keyball.oled_inversion;
+    if (!transaction_rpc_send(KEYBALL_SET_OLED_INVERSION, sizeof(req), &req)) {
+        return;
+    }
+    keyball.oled_inversion_changed = false;
+}
+#endif
+
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -533,6 +551,16 @@ bool keyball_is_oled_on() {
     return is_oled_on();
 #endif
 }
+
+void keyball_oled_sync_inversion() {
+#ifdef OLED_ENABLE
+    if (is_keyboard_master()) {
+        return;
+    }
+
+    oled_invert(keyball.oled_inversion);
+ #endif
+}
 //////////////////////////////////////////////////////////////////////////////
 // Public API functions
 
@@ -594,6 +622,9 @@ void keyboard_post_init_kb(void) {
         transaction_register_rpc(KEYBALL_GET_INFO, rpc_get_info_handler);
         transaction_register_rpc(KEYBALL_GET_MOTION, rpc_get_motion_handler);
         transaction_register_rpc(KEYBALL_SET_CPI, rpc_set_cpi_handler);
+#ifdef OLED_ENABLE
+        transaction_register_rpc(KEYBALL_SET_OLED_INVERSION, rpc_set_oled_invert_handler);
+#endif
     }
 #endif
 
@@ -631,7 +662,9 @@ void housekeeping_task_kb(void) {
             rpc_get_motion_invoke();
             rpc_set_cpi_invoke();
         }
+
 #ifdef OLED_ENABLE
+        rpc_set_oled_invert_invoke();
         if (keyball.oled_on) {
             bool should_oled_on = (timer_elapsed32(keyball.oled_timer) <= KEYBALL_OLED_TIMEOUT);
             if (!should_oled_on && is_oled_on()) {
@@ -798,6 +831,7 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
                 // Sync maybe needed if both sides get inverted.
                 // https://www.reddit.com/r/olkb/comments/1033bz0/comment/j2zs4xe/?tl=ja
                 keyball.oled_inversion = !keyball.oled_inversion;
+                keyball.oled_inversion_changed = true;
                 oled_invert(keyball.oled_inversion);
                 break;
 #endif

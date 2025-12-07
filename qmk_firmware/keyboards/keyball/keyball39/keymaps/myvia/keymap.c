@@ -76,6 +76,8 @@ void oledkit_render_logo_user(void) {
     if (!keyball_is_oled_on()) {
         return;
     }
+    keyball_oled_sync_inversion();
+
     // Require `OLED_FONT_H "keyboards/keyball/lib/logofont/logofont.c"`
     char ch = 0x80;
     for (int y = 0; y < 3; y++) {
