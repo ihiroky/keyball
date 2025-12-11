@@ -20,6 +20,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "quantum.h"
 
+#define DEFAULT_LAYER 0
+#define MOUSE_LAYER 4
+#define MOUSE_ACTIVATE_THRESHOLD 50
+
+typedef struct {
+    bool          active;
+    uint16_t      motion_accum;
+} mouse_layer_state_t;
+
+static mouse_layer_state_t mouse_layer_state = {0};
+
+static inline uint8_t abs8(int8_t v) {
+    return v < 0 ? (uint8_t)(-v) : (uint8_t)v;
+}
+
+static bool mouse_motion_exceeds_threshold(const report_mouse_t *report) {
+    uint16_t delta = (uint16_t)abs8(report->x) + (uint16_t)abs8(report->y) + (uint16_t)abs8(report->h) + (uint16_t)abs8(report->v);
+    if (delta == 0) {
+        return false;
+    }
+    mouse_layer_state.motion_accum += delta;
+    if (mouse_layer_state.motion_accum >= MOUSE_ACTIVATE_THRESHOLD) {
+        mouse_layer_state.motion_accum = 0;
+        return true;
+    }
+    return false;
+}
+
+static inline bool is_mouse_layer_key_allowed(keyrecord_t *record) {
+    uint16_t mouse_layer_keycode = keymap_key_to_keycode(MOUSE_LAYER, record->event.key);
+    switch (mouse_layer_keycode) {
+        case KC_BTN1:
+        case KC_BTN2:
+        case KC_BTN3:
+        case KC_BTN4:
+        case KC_BTN5:
+        case KC_BTN6:
+        case KC_BTN7:
+        case KC_BTN8:
+        case KC_WH_U:
+        case KC_WH_D:
+        case KC_WH_L:
+        case KC_WH_R:
+        case KC_MS_UP:
+        case KC_MS_DOWN:
+        case KC_MS_LEFT:
+        case KC_MS_RIGHT:
+        case KC_ACL0:
+        case KC_ACL1:
+        case KC_ACL2:
+        case KC_LSFT:
+        case KC_LCTL:
+        case KC_LALT:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static inline bool is_mouse_layer_active(void) {
+    return mouse_layer_state.active && layer_state_is(MOUSE_LAYER);
+}
+
 // clang-format off
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // keymap for default (VIA)
@@ -50,12 +113,44 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     RGB_RMOD , RGB_HUD  , RGB_SAD  , RGB_VAD  , SCRL_DVD ,                            CPI_D1K  , CPI_D100 , CPI_I100 , CPI_I1K  , KBC_SAVE ,
     QK_BOOT  , KBC_RST  , _______  , _______  , _______  , _______  ,      _______  , _______  , _______  , _______  , KBC_RST  , QK_BOOT
   ),
+
+  [4] = LAYOUT_universal(
+    _______ , _______ , _______ , _______ , _______ ,                          _______ , _______ , _______ , _______ , _______ ,
+    _______ , KC_LSFT , KC_LCTL , KC_LALT , _______ ,                          KC_BTN4 , KC_BTN1 , KC_BTN2 , KC_BTN3 , KC_BTN5 ,
+    _______ , _______ , _______ , _______ , _______ ,                          _______ , _______ , _______ , _______ , _______ ,
+    _______ , _______ , _______ , _______ , _______ , _______ ,      _______ , TO(0)   , _______ , _______ , _______ , _______
+  ),
 };
 // clang-format on
 
+report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
+    if (mouse_layer_state.active && !layer_state_is(MOUSE_LAYER)) {
+        mouse_layer_state.active = false;
+    }
+
+    if (!mouse_layer_state.active && mouse_motion_exceeds_threshold(&mouse_report)) {
+        layer_on(MOUSE_LAYER);
+        mouse_layer_state.active = true;
+    }
+
+    return mouse_report;
+}
+
+bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (is_mouse_layer_active() && record->event.pressed) {
+        bool allowed = is_mouse_layer_key_allowed(record);
+        if (!allowed) {
+            mouse_layer_state.active = false;
+            layer_move(DEFAULT_LAYER);
+        }
+    }
+
+    return true;
+}
+
 layer_state_t layer_state_set_user(layer_state_t state) {
-    // Auto enable scroll mode when the highest layer is 3
-    keyball_set_scroll_mode(get_highest_layer(state) == 3);
+    // Enable scroll mode whenever layer 3 is active
+    keyball_set_scroll_mode(layer_state_cmp(state, 3));
     return state;
 }
 
