@@ -23,13 +23,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define DEFAULT_LAYER 0
 #define MOUSE_LAYER 4
 #define MOUSE_ACTIVATE_THRESHOLD 50
+#define MOUSE_BTN1_RETURN_TERM 160
 
 typedef struct {
     bool          active;
     uint16_t      motion_accum;
+    uint16_t      btn1_timer;
+    bool          btn1_pressed;
+    bool          btn1_waiting_return;
 } mouse_layer_state_t;
 
 static mouse_layer_state_t mouse_layer_state = {0};
+
+static void mouse_layer_maybe_return(void);
 
 static inline uint8_t abs8(int8_t v) {
     return v < 0 ? (uint8_t)(-v) : (uint8_t)v;
@@ -51,28 +57,17 @@ static bool mouse_motion_exceeds_threshold(const report_mouse_t *report) {
 static inline bool is_mouse_layer_key_allowed(keyrecord_t *record) {
     uint16_t mouse_layer_keycode = keymap_key_to_keycode(MOUSE_LAYER, record->event.key);
     switch (mouse_layer_keycode) {
-        case KC_BTN1:
-        case KC_BTN2:
-        case KC_BTN3:
-        case KC_BTN4:
-        case KC_BTN5:
-        case KC_BTN6:
-        case KC_BTN7:
-        case KC_BTN8:
-        case KC_WH_U:
-        case KC_WH_D:
-        case KC_WH_L:
-        case KC_WH_R:
-        case KC_MS_UP:
-        case KC_MS_DOWN:
-        case KC_MS_LEFT:
-        case KC_MS_RIGHT:
-        case KC_ACL0:
-        case KC_ACL1:
-        case KC_ACL2:
+        case KC_BTN1 ... KC_BTN8:
+        case KC_WH_U ... KC_WH_R:
+        case KC_MS_UP ... KC_MS_RIGHT:
+        case KC_ACL0 ... KC_ACL2:
         case KC_LSFT:
         case KC_LCTL:
         case KC_LALT:
+        case KC_WWW_SEARCH ... KC_WWW_FAVORITES:
+        case KC_F1 ... KC_F12:
+        case A(KC_RIGHT):
+        case A(KC_LEFT):
             return true;
         default:
             return false;
@@ -81,6 +76,30 @@ static inline bool is_mouse_layer_key_allowed(keyrecord_t *record) {
 
 static inline bool is_mouse_layer_active(void) {
     return mouse_layer_state.active && layer_state_is(MOUSE_LAYER);
+}
+
+static void mouse_layer_return_to_default(void) {
+    mouse_layer_state.active          = false;
+    mouse_layer_state.btn1_pressed    = false;
+    mouse_layer_state.btn1_timer      = 0;
+    mouse_layer_state.btn1_waiting_return = false;
+    mouse_layer_state.motion_accum    = 0;
+
+    layer_move(DEFAULT_LAYER);
+}
+
+static void mouse_layer_maybe_return(void) {
+    if (!mouse_layer_state.active) {
+        return;
+    }
+
+    if (!mouse_layer_state.btn1_waiting_return || mouse_layer_state.btn1_pressed || mouse_layer_state.btn1_timer == 0) {
+        return;
+    }
+
+    if (timer_elapsed(mouse_layer_state.btn1_timer) >= MOUSE_BTN1_RETURN_TERM) {
+        mouse_layer_return_to_default();
+    }
 }
 
 // clang-format off
@@ -115,15 +134,17 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   ),
 
   [4] = LAYOUT_universal(
-    _______ , _______ , _______ , _______ , _______ ,                          _______ , _______ , _______ , _______ , _______ ,
-    _______ , KC_LSFT , KC_LCTL , KC_LALT , _______ ,                          KC_BTN4 , KC_BTN1 , KC_BTN2 , KC_BTN3 , KC_BTN5 ,
-    _______ , _______ , _______ , _______ , _______ ,                          _______ , _______ , _______ , _______ , _______ ,
-    _______ , _______ , _______ , _______ , _______ , _______ ,      _______ , TO(0)   , _______ , _______ , _______ , _______
+    _______  , _______  , _______  , _______  , _______  ,                            _______  , KC_F3    , KC_F5    , KC_F12   , _______  ,
+    _______  , KC_LSFT  , KC_LCTL  , KC_LALT  , _______  ,                            KC_LEFT  , KC_BTN1  , KC_BTN3  , KC_BTN2  , KC_RGHT  ,
+    _______  , _______  , _______  , _______  , _______  ,                            _______  , _______  , _______  , _______  , _______  ,
+    _______  , _______  , _______  , _______  , _______  , _______  ,      _______  , TO(0)    , _______  , _______  , _______  , _______
   ),
 };
 // clang-format on
 
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
+    mouse_layer_maybe_return();
+
     if (mouse_layer_state.active && !layer_state_is(MOUSE_LAYER)) {
         mouse_layer_state.active = false;
     }
@@ -137,11 +158,38 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    if (is_mouse_layer_active() && record->event.pressed) {
+    mouse_layer_maybe_return();
+
+    if (!is_mouse_layer_active()) {
+        return true;
+    }
+
+    if (keycode == KC_BTN1) {
+        if (record->event.pressed) {
+            // Second tap within term cancels pending return and completes as double tap
+            if (mouse_layer_state.btn1_waiting_return && mouse_layer_state.btn1_timer != 0 &&
+                timer_elapsed(mouse_layer_state.btn1_timer) < MOUSE_BTN1_RETURN_TERM) {
+                mouse_layer_state.btn1_waiting_return = false;
+                mouse_layer_state.btn1_timer          = 0;
+            }
+            mouse_layer_state.btn1_pressed = true;
+        } else if (mouse_layer_state.btn1_pressed) {
+            mouse_layer_state.btn1_pressed = false;
+            if (mouse_layer_state.btn1_waiting_return) {
+                // Second release: return immediately after double click
+                mouse_layer_return_to_default();
+            } else {
+                // First release: wait for possible second click
+                mouse_layer_state.btn1_waiting_return = true;
+                mouse_layer_state.btn1_timer          = timer_read();
+            }
+        }
+    }
+
+    if (record->event.pressed) {
         bool allowed = is_mouse_layer_key_allowed(record);
         if (!allowed) {
-            mouse_layer_state.active = false;
-            layer_move(DEFAULT_LAYER);
+            mouse_layer_return_to_default();
         }
     }
 
