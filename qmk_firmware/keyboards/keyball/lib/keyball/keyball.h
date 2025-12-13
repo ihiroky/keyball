@@ -137,6 +137,8 @@ typedef union {
 #ifdef OLED_ENABLE
         uint8_t oledinv : 1; //  OLED inversion
 #endif
+        uint8_t ase : 1; // auto shift enabled
+        uint16_t asto : 5; // auto shift timeout
     };
 } keyball_config_t;
 
