@@ -255,14 +255,24 @@ combo_t key_combos[] = {
 
 #ifdef TAP_DANCE_ENABLE
 
+// Japanese keyboard specific characters
+
 enum {
-    TD_QUOT_DQUO,
+    TD_QUOTS,
     TD_PIPE_TILD,
 };
 
+static void td_quot_handler(tap_dance_state_t *state, void *user_data) {
+    // 1 tap: ' , 2 taps: " , 3+ taps: `
+    const uint16_t c =
+        (state->count == 1) ? S(KC_7) :
+        (state->count == 2) ? S(KC_2) :
+        S(KC_LEFT_BRACKET);
+    tap_code16(c);
+}
+
 tap_dance_action_t tap_dance_actions[] = {
-    // Japanese keyboard specific characters
-    [TD_QUOT_DQUO] = ACTION_TAP_DANCE_DOUBLE(S(KC_7), S(KC_2)),
+    [TD_QUOTS] = ACTION_TAP_DANCE_FN(td_quot_handler),
     [TD_PIPE_TILD] = ACTION_TAP_DANCE_DOUBLE(S(KC_INTERNATIONAL_3), S(KC_EQUAL)),
 };
 
