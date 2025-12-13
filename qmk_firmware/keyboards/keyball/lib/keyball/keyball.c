@@ -31,7 +31,9 @@ const uint8_t SCROLL_DIV_MAX = 7;
 
 const uint16_t AML_TIMEOUT_MIN = 100;
 const uint16_t AML_TIMEOUT_MAX = 1000;
-const uint16_t AML_TIMEOUT_QU  = 50;   // Quantization Unit
+const uint16_t AUTO_SHIFT_TIMEOUT_MIN = 50;
+const uint16_t AUTO_SHIFT_TIMEOUT_MAX = 1000;
+const uint16_t AUTO_TIMEOUT_QU  = 50;   // Quantization Unit
 
 #define BL ((char)0xB0)
 static const char LFSTR_ON[] PROGMEM = "\xB2\xB3";
@@ -499,6 +501,11 @@ void keyball_oled_render_keyinfo(void) {
 #endif
 }
 
+void keyball_oled_write_timeout(uint16_t timeout) {
+    oled_write(format_4d(timeout / 10) + 1, false);
+    oled_write_char((char) ('0' + (timeout % 10)), false);
+}
+
 void keyball_oled_render_layerinfo(void) {
 #ifdef OLED_ENABLE
     // Format: `Layer:{layer state}`
@@ -521,10 +528,15 @@ void keyball_oled_render_layerinfo(void) {
         oled_write_P(LFSTR_OFF, false);
     }
 
-    oled_write(format_4d(get_auto_mouse_timeout() / 10) + 1, false);
-    oled_write_char('0', false);
+    keyball_oled_write_timeout(get_auto_mouse_timeout());
 #    else
-    oled_write_P(PSTR("\xC2\xC3\xB4\xB5 ---"), false);
+    oled_write_P(PSTR("\xC4\xC5"), false);
+    if (get_autoshift_state()) {
+        oled_write_P(LFSTR_ON, false);
+    } else {
+        oled_write_P(LFSTR_OFF, false);
+    }
+    keyball_oled_write_timeout(get_generic_autoshift_timeout());
 #    endif
 #endif
 }
@@ -635,7 +647,7 @@ void keyboard_post_init_kb(void) {
         keyball_set_scroll_div(c.sdiv);
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
         set_auto_mouse_enable(c.amle);
-        set_auto_mouse_timeout(c.amlto == 0 ? AUTO_MOUSE_TIME : (c.amlto + 1) * AML_TIMEOUT_QU);
+        set_auto_mouse_timeout(c.amlto == 0 ? AUTO_MOUSE_TIME : (c.amlto + 1) * AUTO_TIMEOUT_QU);
 #endif
 #if KEYBALL_SCROLLSNAP_ENABLE == 2
         keyball_set_scrollsnap_mode(c.ssnap);
@@ -644,6 +656,12 @@ void keyboard_post_init_kb(void) {
         keyball.oled_inversion = c.oledinv ? true : false;
         oled_invert(keyball.oled_inversion);
 #endif
+        if (c.ase) {
+            autoshift_enable();
+        } else {
+            autoshift_disable();
+        }
+        set_autoshift_timeout(c.asto == 0 ? AUTO_SHIFT_TIMEOUT : (c.asto + 1) * AUTO_TIMEOUT_QU);
     }
 
 #ifdef OLED_ENABLE
@@ -753,12 +771,14 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
 #endif
                 break;
             case KBC_SAVE: {
+                uint16_t asto = get_generic_autoshift_timeout() <= AUTO_SHIFT_TIMEOUT_MIN ?
+                    AUTO_SHIFT_TIMEOUT_MIN : MIN(get_generic_autoshift_timeout(), AUTO_SHIFT_TIMEOUT_MAX);
                 keyball_config_t c = {
                     .cpi   = keyball.cpi_value,
                     .sdiv  = keyball.scroll_div,
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
                     .amle  = get_auto_mouse_enable(),
-                    .amlto = (get_auto_mouse_timeout() / AML_TIMEOUT_QU) - 1,
+                    .amlto = (get_auto_mouse_timeout() / AUTO_TIMEOUT_QU) - 1,
 #endif
 #if KEYBALL_SCROLLSNAP_ENABLE == 2
                     .ssnap = keyball_get_scrollsnap_mode(),
@@ -766,6 +786,8 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
 #ifdef OLED_ENABLE
                     .oledinv = keyball.oled_inversion ? 1 : 0,
 #endif
+                    .ase   = get_autoshift_state() ? 1 : 0,
+                    .asto  = (asto / AUTO_TIMEOUT_QU) - 1,
                 };
                 eeconfig_update_kb(c.raw);
             } break;
