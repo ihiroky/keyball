@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // it has been reported to work well in such cases.
 //#define SPLIT_WATCHDOG_ENABLE
 
-#define SPLIT_TRANSACTION_IDS_KB KEYBALL_GET_INFO, KEYBALL_GET_MOTION, KEYBALL_SET_CPI, KEYBALL_SET_OLED_INVERSION
+#define SPLIT_TRANSACTION_IDS_KB KEYBALL_GET_INFO, KEYBALL_GET_MOTION, KEYBALL_SET_CPI
 
 // RGB LED settings
 #define WS2812_DI_PIN       D3
@@ -66,8 +66,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifndef OLED_FONT_H
 #    define OLED_FONT_H "keyboards/keyball/lib/logofont/logofont.c"
-#    define OLED_FONT_START 32 // 0x20
-#    define OLED_FONT_END 197  // 0xC5
+#    define OLED_FONT_START 32
+#    define OLED_FONT_END 195
 #endif
 
 #if !defined(LAYER_STATE_8BIT) && !defined(LAYER_STATE_16BIT) && !defined(LAYER_STATE_32BIT)

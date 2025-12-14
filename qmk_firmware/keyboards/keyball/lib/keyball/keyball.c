@@ -31,9 +31,7 @@ const uint8_t SCROLL_DIV_MAX = 7;
 
 const uint16_t AML_TIMEOUT_MIN = 100;
 const uint16_t AML_TIMEOUT_MAX = 1000;
-const uint16_t AUTO_SHIFT_TIMEOUT_MIN = 50;
-const uint16_t AUTO_SHIFT_TIMEOUT_MAX = 1000;
-const uint16_t AUTO_TIMEOUT_QU  = 50;   // Quantization Unit
+const uint16_t AML_TIMEOUT_QU  = 50;   // Quantization Unit
 
 #define BL ((char)0xB0)
 static const char LFSTR_ON[] PROGMEM = "\xB2\xB3";
@@ -375,24 +373,6 @@ static void rpc_set_cpi_invoke(void) {
     keyball.cpi_changed = false;
 }
 
-#ifdef OLED_ENABLE
-static void rpc_set_oled_invert_handler(uint8_t in_buflen, const void *in_data, uint8_t out_buflen, void *out_data) {
-    bool oled_inversion = *(bool *)in_data;
-    keyball.oled_inversion = oled_inversion;
-}
-
-static void rpc_set_oled_invert_invoke(void) {
-    if (!keyball.oled_inversion_changed) {
-        return;
-    }
-    bool req = keyball.oled_inversion;
-    if (!transaction_rpc_send(KEYBALL_SET_OLED_INVERSION, sizeof(req), &req)) {
-        return;
-    }
-    keyball.oled_inversion_changed = false;
-}
-#endif
-
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -501,11 +481,6 @@ void keyball_oled_render_keyinfo(void) {
 #endif
 }
 
-void keyball_oled_write_timeout(uint16_t timeout) {
-    oled_write(format_4d(timeout / 10) + 1, false);
-    oled_write_char((char) ('0' + (timeout % 10)), false);
-}
-
 void keyball_oled_render_layerinfo(void) {
 #ifdef OLED_ENABLE
     // Format: `Layer:{layer state}`
@@ -528,51 +503,14 @@ void keyball_oled_render_layerinfo(void) {
         oled_write_P(LFSTR_OFF, false);
     }
 
-    keyball_oled_write_timeout(get_auto_mouse_timeout());
+    oled_write(format_4d(get_auto_mouse_timeout() / 10) + 1, false);
+    oled_write_char('0', false);
 #    else
-    oled_write_P(PSTR("\xC4\xC5"), false);
-    if (get_autoshift_state()) {
-        oled_write_P(LFSTR_ON, false);
-    } else {
-        oled_write_P(LFSTR_OFF, false);
-    }
-    keyball_oled_write_timeout(get_generic_autoshift_timeout());
+    oled_write_P(PSTR("\xC2\xC3\xB4\xB5 ---"), false);
 #    endif
 #endif
 }
 
-void keyball_oled_on(bool on) {
-#ifdef OLED_ENABLE
-    if (on && !keyball.oled_on) {
-        oled_on();
-        keyball.oled_on = true;
-        keyball.oled_timer = timer_read32();
-    } else {
-        oled_off();
-        keyball.oled_on = false;
-        keyball.oled_timer = 0;
-    }
-#endif
-}
-
-bool keyball_is_oled_on() {
-#ifdef OLED_ENABLE
-    if (is_keyboard_master()){
-        return keyball.oled_on;
-    }
-    return is_oled_on();
-#endif
-}
-
-void keyball_oled_sync_inversion() {
-#ifdef OLED_ENABLE
-    if (is_keyboard_master()) {
-        return;
-    }
-
-    oled_invert(keyball.oled_inversion);
- #endif
-}
 //////////////////////////////////////////////////////////////////////////////
 // Public API functions
 
@@ -627,6 +565,9 @@ void keyball_set_cpi(uint8_t cpi) {
 //////////////////////////////////////////////////////////////////////////////
 // Keyboard hooks
 
+__attribute__((weak)) void keyball_keyboard_post_init_kb_eeconfig(uint32_t raw) {
+}
+
 void keyboard_post_init_kb(void) {
 #ifdef SPLIT_KEYBOARD
     // register transaction handlers on secondary.
@@ -634,9 +575,6 @@ void keyboard_post_init_kb(void) {
         transaction_register_rpc(KEYBALL_GET_INFO, rpc_get_info_handler);
         transaction_register_rpc(KEYBALL_GET_MOTION, rpc_get_motion_handler);
         transaction_register_rpc(KEYBALL_SET_CPI, rpc_set_cpi_handler);
-#ifdef OLED_ENABLE
-        transaction_register_rpc(KEYBALL_SET_OLED_INVERSION, rpc_set_oled_invert_handler);
-#endif
     }
 #endif
 
@@ -647,27 +585,14 @@ void keyboard_post_init_kb(void) {
         keyball_set_scroll_div(c.sdiv);
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
         set_auto_mouse_enable(c.amle);
-        set_auto_mouse_timeout(c.amlto == 0 ? AUTO_MOUSE_TIME : (c.amlto + 1) * AUTO_TIMEOUT_QU);
+        set_auto_mouse_timeout(c.amlto == 0 ? AUTO_MOUSE_TIME : (c.amlto + 1) * AML_TIMEOUT_QU);
 #endif
 #if KEYBALL_SCROLLSNAP_ENABLE == 2
         keyball_set_scrollsnap_mode(c.ssnap);
 #endif
-#ifdef OLED_ENABLE
-        keyball.oled_inversion = c.oledinv ? true : false;
-        oled_invert(keyball.oled_inversion);
-#endif
-        if (c.ase) {
-            autoshift_enable();
-        } else {
-            autoshift_disable();
-        }
-        set_autoshift_timeout(c.asto == 0 ? AUTO_SHIFT_TIMEOUT : (c.asto + 1) * AUTO_TIMEOUT_QU);
+        keyball_keyboard_post_init_kb_eeconfig(c.raw);
     }
 
-#ifdef OLED_ENABLE
-    // turn on OLED on startup.
-    keyball_oled_on(true);
-#endif
     keyball_on_adjust_layout(KEYBALL_ADJUST_PENDING);
     keyboard_post_init_user();
 }
@@ -680,16 +605,6 @@ void housekeeping_task_kb(void) {
             rpc_get_motion_invoke();
             rpc_set_cpi_invoke();
         }
-
-#ifdef OLED_ENABLE
-        rpc_set_oled_invert_invoke();
-        if (keyball.oled_on) {
-            bool should_oled_on = (timer_elapsed32(keyball.oled_timer) <= KEYBALL_OLED_TIMEOUT);
-            if (!should_oled_on && is_oled_on()) {
-                keyball_oled_on(false);
-            }
-        }
-#endif
     }
 }
 #endif
@@ -723,6 +638,10 @@ bool is_mouse_record_kb(uint16_t keycode, keyrecord_t* record) {
     return is_mouse_record_user(keycode, record);
 }
 #endif
+
+__attribute__((weak)) uint32_t keyball_process_record_kb_eeconfig(uint32_t raw) {
+    return raw;
+}
 
 bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
     // store last keycode, row, and col for OLED
@@ -771,24 +690,18 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
 #endif
                 break;
             case KBC_SAVE: {
-                uint16_t asto = get_generic_autoshift_timeout() <= AUTO_SHIFT_TIMEOUT_MIN ?
-                    AUTO_SHIFT_TIMEOUT_MIN : MIN(get_generic_autoshift_timeout(), AUTO_SHIFT_TIMEOUT_MAX);
                 keyball_config_t c = {
                     .cpi   = keyball.cpi_value,
                     .sdiv  = keyball.scroll_div,
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
                     .amle  = get_auto_mouse_enable(),
-                    .amlto = (get_auto_mouse_timeout() / AUTO_TIMEOUT_QU) - 1,
+                    .amlto = (get_auto_mouse_timeout() / AML_TIMEOUT_QU) - 1,
 #endif
 #if KEYBALL_SCROLLSNAP_ENABLE == 2
                     .ssnap = keyball_get_scrollsnap_mode(),
 #endif
-#ifdef OLED_ENABLE
-                    .oledinv = keyball.oled_inversion ? 1 : 0,
-#endif
-                    .ase   = get_autoshift_state() ? 1 : 0,
-                    .asto  = (asto / AUTO_TIMEOUT_QU) - 1,
                 };
+                c.raw = keyball_process_record_kb_eeconfig(c.raw);
                 eeconfig_update_kb(c.raw);
             } break;
 
@@ -842,19 +755,6 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
                     uint16_t v = get_auto_mouse_timeout() - 50;
                     set_auto_mouse_timeout(MAX(v, AML_TIMEOUT_MIN));
                 }
-                break;
-#endif
-
-#ifdef OLED_ENABLE
-            case OLED_TOGGLE:
-                keyball_oled_on(!keyball.oled_on);
-                break;
-            case OLED_TOGGLE_INVERT:
-                // Sync maybe needed if both sides get inverted.
-                // https://www.reddit.com/r/olkb/comments/1033bz0/comment/j2zs4xe/?tl=ja
-                keyball.oled_inversion = !keyball.oled_inversion;
-                keyball.oled_inversion_changed = true;
-                oled_invert(keyball.oled_inversion);
                 break;
 #endif
 
