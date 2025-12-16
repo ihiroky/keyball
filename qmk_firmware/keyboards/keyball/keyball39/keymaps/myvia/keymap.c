@@ -23,33 +23,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define DEFAULT_LAYER 0
 #define MOUSE_LAYER 4
-#define MOUSE_ACTIVATION_THRESHOLD 50 // TODO configurable
-#define MOUSE_BTN1_RETURN_TERM 160
+#define MOUSE_ACTIVATION_THRESHOLD 50
+#define MOUSE_BTN1_RETURN_TERM TAPPING_TERM
 
+const uint16_t MOUSE_ACTIVATION_THRESHOLD_MIN = 5;
+const uint16_t MOUSE_ACTIVATION_THRESHOLD_MAX = 155;
+const uint16_t MOUSE_ACTIVATION_THRESHOLD_QU = 5;
 const uint16_t AUTO_SHIFT_TIMEOUT_MIN = 50;
-const uint16_t AUTO_SHIFT_TIMEOUT_MAX = 1000;
-const uint16_t AUTO_SHIFT_TIMEOUT_QU  = 50;   // Quantization Unit
+const uint16_t AUTO_SHIFT_TIMEOUT_MAX = 360;
+const uint16_t AUTO_SHIFT_TIMEOUT_QU  = 5;   // Quantization Unit
 
 enum user_keycodes {
-    OLED_TOGGLE = KEYBALL_SAFE_RANGE, // Toggle OLED on/off
+    OLED_TOGGLE = KEYBALL_SAFE_RANGE, // Toggle OLED on/off ,User 0
     OLED_TOGGLE_INVERT,               // Invert OLED display
+    MAT_I5, // Increase mouse_activation_threshold by 5
+    MAT_D5, // Decrease mouse_activation_threshold by 5
 };
 
 typedef union {
     uint32_t raw;
     struct {
 #ifdef OLED_ENABLE
-        uint32_t keyball_reserved : 25;
-        uint8_t  oled_inversion : 1; //  OLED inversion
+        uint32_t keyball_reserved : 19;
+        uint8_t  oled_inversion : 1;
 #else
-        uint32_t keyball_reserved : 26;
+        uint32_t keyball_reserved : 20;
 #endif
-        uint8_t  autoshift_enabled : 1; // auto shift enabled
-        uint16_t autoshift_timeout : 5; // auto shift timeout
+        uint16_t mouse_activation_threshold : 5;
+        uint8_t  autoshift_enabled : 1;
+        uint16_t autoshift_timeout : 6;
     };
 } user_config_t;
 
 typedef struct {
+    uint16_t mouse_activation_threshold;
 #ifdef OLED_ENABLE
     bool oled_on;
     uint32_t oled_timer;
@@ -121,7 +128,7 @@ static bool mouse_motion_exceeds_threshold(const report_mouse_t *report) {
         return false;
     }
     mouse_layer_state.motion_accum += delta;
-    if (mouse_layer_state.motion_accum >= MOUSE_ACTIVATION_THRESHOLD) {
+    if (mouse_layer_state.motion_accum >= user_state.mouse_activation_threshold) {
         mouse_layer_state.motion_accum = 0;
         return true;
     }
@@ -286,26 +293,30 @@ static char to_1x(uint8_t x) {
     return x < 10 ? x + '0' : x + 'a' - 10;
 }
 
-static void oled_write_timeout(uint16_t timeout) {
+static void oled_write_timeout4(uint16_t timeout) {
     oled_write(format_4d(timeout / 10) + 1, false);
     oled_write_char((char) ('0' + (timeout % 10)), false);
+}
+
+static void oled_write_timeout3(uint16_t timeout) {
+    oled_write(format_4d(timeout) + 1, false);
 }
 
 #define BL ((char)0xB0)
 static const char LFSTR_ON[] PROGMEM = "\xB2\xB3";
 static const char LFSTR_OFF[] PROGMEM = "\xB4\xB5";
 
+// TODO rename
 void oled_render_layer_aml_as_info(void) {
-    // Format: `Layer:{layer state}`
-    //
-    // Output example:
-    //
-    //     Layer:-23------------
-    //
-    oled_write_P(PSTR("L\xB6\xB7r\xB1"), false);
-    for (uint8_t i = 1; i < 8; i++) {
+    oled_write_char('L', false);
+    for (uint8_t i = 1; i < 6; i++) {
         oled_write_char((layer_state_is(i) ? to_1x(i) : BL), false);
     }
+    oled_write_char(' ', false);
+
+    // TODO AML => MAT in 2 bytes, use format_3d() => 5 bytes
+    oled_write_P(PSTR("\xC2\xC3"), false);
+    oled_write_timeout3(user_state.mouse_activation_threshold);
     oled_write_char(' ', false);
 
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
@@ -316,7 +327,7 @@ void oled_render_layer_aml_as_info(void) {
         oled_write_P(LFSTR_OFF, false);
     }
 
-    oled_write_timeout(get_auto_mouse_timeout());
+    oled_write_timeout4(get_auto_mouse_timeout());
 #    else
     oled_write_P(PSTR("\xC4\xC5"), false);
     if (get_autoshift_state()) {
@@ -324,7 +335,7 @@ void oled_render_layer_aml_as_info(void) {
     } else {
         oled_write_P(LFSTR_OFF, false);
     }
-    oled_write_timeout(get_generic_autoshift_timeout());
+    oled_write_timeout4(get_generic_autoshift_timeout());
 #    endif
 }
 
@@ -396,17 +407,28 @@ void keyboard_post_init_user() {
 void keyball_keyboard_post_init_kb_eeconfig(uint32_t raw) {
     user_config_t c = { .raw = raw };
 
-    // TODO
+    // c.mouse_activation_threshold * MOUSE_ACTIVATION_THRESHOLD_QU
+    // is the same as
+    // MOUSE_ACTIVATION_THRESHOLD_MIN + MOUSE_ACTIVATION_THRESHOLD_QU * (c.mouse_activation_threshold - 1)
+    // if MOUSE_ACTIVATION_THRESHOLD_MIN === MOUSE_ACTIVATION_THRESHOLD_QU
+    user_state.mouse_activation_threshold = (c.mouse_activation_threshold == 0)
+        ? MOUSE_ACTIVATION_THRESHOLD
+        : c.mouse_activation_threshold * MOUSE_ACTIVATION_THRESHOLD_QU;
+
 #ifdef OLED_ENABLE
-        user_state.oled_inversion = c.oled_inversion ? true : false;
-        oled_invert(user_state.oled_inversion);
+    user_state.oled_inversion = c.oled_inversion ? true : false;
+    oled_invert(user_state.oled_inversion);
 #endif
-        if (c.autoshift_enabled) {
-            autoshift_enable();
-        } else {
-            autoshift_disable();
-        }
-        set_autoshift_timeout(c.autoshift_timeout == 0 ? AUTO_SHIFT_TIMEOUT : (c.autoshift_timeout + 1) * AUTO_SHIFT_TIMEOUT_QU);
+    if (c.autoshift_enabled) {
+        autoshift_enable();
+    } else {
+        autoshift_disable();
+    }
+    set_autoshift_timeout(
+        c.autoshift_timeout == 0
+            ? AUTO_SHIFT_TIMEOUT
+            : AUTO_SHIFT_TIMEOUT_MIN + AUTO_SHIFT_TIMEOUT_QU * (c.autoshift_timeout - 1)
+    );
 }
 
 void housekeeping_task_user() {
@@ -426,6 +448,8 @@ void housekeeping_task_user() {
 uint32_t keyball_process_record_kb_eeconfig(uint32_t raw) {
     user_config_t c = { .raw = raw };
 
+    c.mouse_activation_threshold = user_state.mouse_activation_threshold / MOUSE_ACTIVATION_THRESHOLD_QU;
+
 #ifdef OLED_ENABLE
     c.oled_inversion = user_state.oled_inversion ? 1 : 0;
 #endif
@@ -433,14 +457,16 @@ uint32_t keyball_process_record_kb_eeconfig(uint32_t raw) {
     uint16_t autoshift_timeout = get_generic_autoshift_timeout() <= AUTO_SHIFT_TIMEOUT_MIN
         ? AUTO_SHIFT_TIMEOUT_MIN
         : MIN(get_generic_autoshift_timeout(), AUTO_SHIFT_TIMEOUT_MAX);
-    c.autoshift_enabled   = get_autoshift_state() ? 1 : 0;
-    c.autoshift_timeout  = (autoshift_timeout / AUTO_SHIFT_TIMEOUT_QU) - 1;
+    set_autoshift_timeout(autoshift_timeout);
+    c.autoshift_enabled  = get_autoshift_state() ? 1 : 0;
+    c.autoshift_timeout  = (autoshift_timeout - AUTO_SHIFT_TIMEOUT_MIN) / AUTO_SHIFT_TIMEOUT_QU + 1;
 
     return c.raw;
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (record->event.pressed) {
+        // TODO Update oled timer if oled is on.
         switch (keycode) {
 #ifdef OLED_ENABLE
             case OLED_TOGGLE:
@@ -452,11 +478,27 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 oled_invert(user_state.oled_inversion);
                 break;
 #endif
+            case MAT_I5:
+                {
+                    uint8_t v = user_state.mouse_activation_threshold + 5;
+                    user_state.mouse_activation_threshold = MIN(v, MOUSE_ACTIVATION_THRESHOLD_MAX);
+                }
+                break;
+            case MAT_D5:
+                {
+                    uint8_t v = user_state.mouse_activation_threshold - 5;
+                    user_state.mouse_activation_threshold = MAX(v, MOUSE_ACTIVATION_THRESHOLD_MIN);
+                }
+                break;
+            // The autoshift implementation is in `qmk/quantum/process_keycode/process_auto_shift.c`.
             default:
                 break;
         }
     }
+#ifndef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     handle_mouse_layer(keycode, record);
+#endif
+
     return true;
 }
 
