@@ -565,7 +565,7 @@ void keyball_set_cpi(uint8_t cpi) {
 //////////////////////////////////////////////////////////////////////////////
 // Keyboard hooks
 
-__attribute__((weak)) void keyball_keyboard_post_init_kb_eeconfig(uint32_t raw) {
+__attribute__((weak)) void keyball_keyboard_post_init_eeconfig_user(uint32_t raw) {
 }
 
 void keyboard_post_init_kb(void) {
@@ -590,7 +590,7 @@ void keyboard_post_init_kb(void) {
 #if KEYBALL_SCROLLSNAP_ENABLE == 2
         keyball_set_scrollsnap_mode(c.ssnap);
 #endif
-        keyball_keyboard_post_init_kb_eeconfig(c.raw);
+        keyball_keyboard_post_init_eeconfig_user(c.raw);
     }
 
     keyball_on_adjust_layout(KEYBALL_ADJUST_PENDING);
@@ -639,7 +639,7 @@ bool is_mouse_record_kb(uint16_t keycode, keyrecord_t* record) {
 }
 #endif
 
-__attribute__((weak)) uint32_t keyball_process_record_kb_eeconfig(uint32_t raw) {
+__attribute__((weak)) uint32_t keyball_process_record_eeconfig_user(uint32_t raw) {
     return raw;
 }
 
@@ -701,7 +701,7 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
                     .ssnap = keyball_get_scrollsnap_mode(),
 #endif
                 };
-                c.raw = keyball_process_record_kb_eeconfig(c.raw);
+                c.raw = keyball_process_record_eeconfig_user(c.raw);
                 eeconfig_update_kb(c.raw);
             } break;
 

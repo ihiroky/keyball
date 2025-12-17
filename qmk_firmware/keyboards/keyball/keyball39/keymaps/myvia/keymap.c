@@ -403,7 +403,7 @@ void keyboard_post_init_user() {
 #endif
 }
 
-void keyball_keyboard_post_init_kb_eeconfig(uint32_t raw) {
+void keyball_keyboard_post_init_eeconfig_user(uint32_t raw) {
     user_config_t c = { .raw = raw };
 
     // c.mouse_activation_threshold * MOUSE_ACTIVATION_THRESHOLD_QU
@@ -444,7 +444,7 @@ void housekeeping_task_user() {
     }
 }
 
-uint32_t keyball_process_record_kb_eeconfig(uint32_t raw) {
+uint32_t keyball_process_record_eeconfig_user(uint32_t raw) {
     user_config_t c = { .raw = raw };
 
     c.mouse_activation_threshold = user_state.mouse_activation_threshold / MOUSE_ACTIVATION_THRESHOLD_QU;
