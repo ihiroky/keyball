@@ -270,3 +270,14 @@ uint8_t keyball_get_cpi(void);
 /// In addition, if you do not upload SROM, the maximum value will be limited
 /// to 35 (3500CPI).
 void keyball_set_cpi(uint8_t cpi);
+
+/// keyball_keyboard_post_init_eeconfig_user is called after keyball config
+/// is loaded from EEPROM in keyboard_post_init_kb.
+/// Override this to restore additional user configuration stored in eeconfig.
+/// raw is the eeconfig_read_kb() value (keyball_config_t raw).
+void keyball_keyboard_post_init_eeconfig_user(uint32_t raw);
+
+/// keyball_process_record_eeconfig_user is called before saving keyball config
+/// to EEPROM when KBC_SAVE is pressed.
+/// Override this to add custom bits and return the updated raw value.
+uint32_t keyball_process_record_eeconfig_user(uint32_t raw);
