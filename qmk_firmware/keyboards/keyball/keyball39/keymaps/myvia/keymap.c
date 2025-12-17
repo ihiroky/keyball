@@ -307,15 +307,14 @@ static const char LFSTR_ON[] PROGMEM = "\xB2\xB3";
 static const char LFSTR_OFF[] PROGMEM = "\xB4\xB5";
 
 // TODO rename
-void oled_render_layer_aml_as_info(void) {
+void oled_render_layer_misc_info(void) {
     oled_write_char('L', false);
     for (uint8_t i = 1; i < 6; i++) {
         oled_write_char((layer_state_is(i) ? to_1x(i) : BL), false);
     }
     oled_write_char(' ', false);
 
-    // TODO AML => MAT in 2 bytes, use format_3d() => 5 bytes
-    oled_write_P(PSTR("\xC2\xC3"), false);
+    oled_write_P(PSTR("\xC6\xC7"), false);
     oled_write_timeout3(user_state.mouse_activation_threshold);
     oled_write_char(' ', false);
 
@@ -372,7 +371,7 @@ void oledkit_render_info_user(void) {
     }
     keyball_oled_render_keyinfo();
     keyball_oled_render_ballinfo();
-    oled_render_layer_aml_as_info();
+    oled_render_layer_misc_info();
 }
 
 void oledkit_render_logo_user(void) {
