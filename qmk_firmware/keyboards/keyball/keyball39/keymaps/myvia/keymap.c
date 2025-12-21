@@ -21,6 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "quantum.h"
 #include "transactions.h"
+#include "raw_hid.h"
+#include "tmk_core/protocol/usb_descriptor.h"
+
+#define RAW_REPORT_VERSION 1
+#define RAW_APP_ID_ZQ         0xFF
+#define RAW_REPORT_TYPE_LAYER 0x00
 
 #define DEFAULT_LAYER 0
 #define MOUSE_LAYER 4
@@ -50,9 +56,16 @@ enum user_tapdance_keycodes {
 typedef union {
     uint32_t raw;
     struct {
-#ifdef OLED_ENABLE
+#if defined(OLED_ENABLE) && defined(RAW_ENABLE)
+        uint32_t keyball_reserved : 18;
+        uint8_t  report_layer_state : 1;
+        uint8_t  oled_inversion : 1;
+#elif defined(OLED_ENABLE) && !defined(RAW_ENABLE)
         uint32_t keyball_reserved : 19;
         uint8_t  oled_inversion : 1;
+#elif !defined(OLED_ENABLE) && defined(RAW_ENABLE)
+        uint32_t keyball_reserved : 19;
+        uint8_t  report_layer_state : 1;
 #else
         uint32_t keyball_reserved : 20;
 #endif
@@ -69,6 +82,11 @@ typedef struct {
     uint32_t oled_timer;
     bool oled_inversion;
     bool oled_inversion_changed;
+#endif
+#ifdef RAW_ENABLE
+    uint8_t last_highest_layer;
+    layer_state_t last_layer_state;
+    bool raw_hid_layer_report_enabled;
 #endif
 } user_state_t;
 
@@ -113,6 +131,56 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   ),
 };
 // clang-format on
+
+// Send highest active layer and bitmask via RAW HID; optionally bypass dedupe.
+// NOTE: intentionally limit reported layers to 0-7 to keep protocol/UI simple.
+static void send_layer_report(layer_state_t state, bool force) {
+#ifdef RAW_ENABLE
+    if (!is_keyboard_master()) {
+        return;
+    }
+    if (!user_state.raw_hid_layer_report_enabled) {
+        return;
+    }
+
+    uint8_t mask     = (uint8_t)(state & 0xFF);  // layers 0-7 only
+    uint8_t highest  = get_highest_layer(state);
+
+    if (!force && highest == user_state.last_highest_layer && state == user_state.last_layer_state) {
+        return;
+    }
+
+    uint8_t report[RAW_EPSIZE] = {0};
+    report[0] = RAW_APP_ID_ZQ;
+    report[1] = RAW_REPORT_VERSION;
+    report[2] = RAW_REPORT_TYPE_LAYER;
+    report[3] = highest;
+    report[4] = mask;
+    raw_hid_send(report, RAW_EPSIZE);
+
+    user_state.last_highest_layer = highest;
+    user_state.last_layer_state   = state;
+#endif
+}
+
+#if defined(RAW_ENABLE) && !defined(VIA_ENABLE)
+void raw_hid_receive(uint8_t *data, uint8_t length) {
+    if (!is_keyboard_master()) {
+        return;
+    }
+    if (!user_state.raw_hid_layer_report_enabled) {
+        return;
+    }
+    if (length < 3) {
+        return;
+    }
+    if (data[0] != RAW_APP_ID_ZQ || data[1] != RAW_REPORT_VERSION || data[2] != RAW_REPORT_TYPE_LAYER) {
+        return;
+    }
+
+    send_layer_report(user_state.last_layer_state, true);
+}
+#endif
 
 #ifndef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 typedef struct {
@@ -243,8 +311,8 @@ void handle_mouse_layer(uint16_t keycode, keyrecord_t *record) {
 #endif
 
 layer_state_t layer_state_set_user(layer_state_t state) {
-    // Enable scroll mode whenever layer 3 is active
     keyball_set_scroll_mode(layer_state_cmp(state, 3));
+    send_layer_report(state, false);
     return state;
 }
 
@@ -313,7 +381,69 @@ static void oled_write_timeout3(uint16_t timeout) {
 static const char LFSTR_ON[] PROGMEM = "\xB2\xB3";
 static const char LFSTR_OFF[] PROGMEM = "\xB4\xB5";
 
-// TODO rename
+void oled_render_ball_misc_info(void) {
+#ifdef OLED_ENABLE
+    // Format: `Ball:{mouse x}{mouse y}{mouse h}{mouse v}`
+    //
+    // Output example:
+    //
+    //     Ball: -12  34   0   0
+
+    // 1st line, "Ball" label, mouse x, y, h, and v.
+    oled_write_P(PSTR("Ball\xB1"), false);
+    oled_write(format_4d(keyball.last_mouse.x), false);
+    oled_write(format_4d(keyball.last_mouse.y), false);
+    oled_write(format_4d(keyball.last_mouse.h), false);
+    oled_write(format_4d(keyball.last_mouse.v), false);
+
+    // 2nd line, empty label and CPI
+#ifndef RAW_ENABLE
+    oled_write_P(PSTR("    \xB1\xBC\xBD"), false);
+#else
+    oled_write_P(PSTR("\xBC\xBD"), false);
+#endif
+    oled_write(format_4d(keyball_get_cpi()) + 1, false);
+    oled_write_P(PSTR("00 "), false);
+
+    // indicate scroll snap mode: "VT" (vertical), "HO" (horizontal), and "SCR" (free)
+#if 1 && KEYBALL_SCROLLSNAP_ENABLE == 2
+    switch (keyball_get_scrollsnap_mode()) {
+        case KEYBALL_SCROLLSNAP_MODE_VERTICAL:
+            oled_write_P(PSTR("VT"), false);
+            break;
+        case KEYBALL_SCROLLSNAP_MODE_HORIZONTAL:
+            oled_write_P(PSTR("HO"), false);
+            break;
+        default:
+            oled_write_P(PSTR("\xBE\xBF"), false);
+            break;
+    }
+#else
+    oled_write_P(PSTR("\xBE\xBF"), false);
+#endif
+    // indicate scroll mode: on/off
+    if (keyball.scroll_mode) {
+        oled_write_P(LFSTR_ON, false);
+    } else {
+        oled_write_P(LFSTR_OFF, false);
+    }
+
+    // indicate scroll divider:
+    oled_write_P(PSTR(" \xC0\xC1"), false);
+    oled_write_char('0' + keyball_get_scroll_div(), false);
+
+    // layer report
+#ifdef RAW_ENABLE
+    oled_write_P(PSTR(" \xC8\xC9"), false);
+    if (user_state.raw_hid_layer_report_enabled) {
+        oled_write_P(LFSTR_ON, false);
+    } else {
+        oled_write_P(LFSTR_OFF, false);
+    }
+#endif
+#endif
+}
+
 void oled_render_layer_misc_info(void) {
     oled_write_char('L', false);
     for (uint8_t i = 1; i < 6; i++) {
@@ -377,7 +507,7 @@ void oledkit_render_info_user(void) {
         return;
     }
     keyball_oled_render_keyinfo();
-    keyball_oled_render_ballinfo();
+    oled_render_ball_misc_info();
     oled_render_layer_misc_info();
 }
 
@@ -401,7 +531,7 @@ void oledkit_render_logo_user(void) {
 #endif
 
 
-void keyboard_post_init_user() {
+void keyboard_post_init_user(void) {
 #ifdef OLED_ENABLE
     transaction_register_rpc(KEYBALL_SET_OLED_INVERSION, rpc_set_oled_invert_handler);
 
@@ -424,6 +554,11 @@ void keyball_keyboard_post_init_eeconfig_user(uint32_t raw) {
 #ifdef OLED_ENABLE
     user_state.oled_inversion = c.oled_inversion ? true : false;
     oled_invert(user_state.oled_inversion);
+#endif
+#ifdef RAW_ENABLE
+    user_state.raw_hid_layer_report_enabled = c.report_layer_state ? true : false;
+    if (user_state.raw_hid_layer_report_enabled) {
+    }
 #endif
     if (c.autoshift_enabled) {
         autoshift_enable();
@@ -458,6 +593,9 @@ uint32_t keyball_process_record_eeconfig_user(uint32_t raw) {
 
 #ifdef OLED_ENABLE
     c.oled_inversion = user_state.oled_inversion ? 1 : 0;
+#endif
+#ifdef RAW_ENABLE
+    c.report_layer_state = user_state.raw_hid_layer_report_enabled ? 1 : 0;
 #endif
 
     uint16_t autoshift_timeout = get_generic_autoshift_timeout() <= AUTO_SHIFT_TIMEOUT_MIN
@@ -496,6 +634,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     user_state.mouse_activation_threshold = MAX(v, MOUSE_ACTIVATION_THRESHOLD_MIN);
                 }
                 break;
+#ifdef RAW_ENABLE
+            case RT_LY_TGL:
+                user_state.raw_hid_layer_report_enabled = !user_state.raw_hid_layer_report_enabled;
+                return false;
+#endif
             // The autoshift implementation is in `qmk/quantum/process_keycode/process_auto_shift.c`.
             default:
                 break;

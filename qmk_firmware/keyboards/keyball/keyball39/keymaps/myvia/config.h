@@ -26,7 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define NO_ACTION_ONESHOT
 
 // Prevent `quantum\keyboard.c` from calling oled_on().
-// Self housekeeping is required to handle oled timeout.
 #define OLED_TIMEOUT 0
 #define KEYBALL_OLED_TIMEOUT 30000
 
@@ -42,4 +41,4 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #undef  OLED_FONT_END
 #define OLED_FONT_H "keyboards/keyball/keyball39/keymaps/myvia/logofont/logofont.c"
 #define OLED_FONT_START 32 // 0x20
-#define OLED_FONT_END 199  // 0xC7
+#define OLED_FONT_END 201  // 0xC9
