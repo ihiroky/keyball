@@ -1,6 +1,7 @@
 /*
 Copyright 2022 @Yowkees
 Copyright 2022 MURAOKA Taro (aka KoRoN, @kaoriya)
+Copyright 2025 Hiroki Itoh / @ihiroky
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -34,10 +35,16 @@ const uint16_t AUTO_SHIFT_TIMEOUT_MAX = 360;
 const uint16_t AUTO_SHIFT_TIMEOUT_QU  = 5;   // Quantization Unit
 
 enum user_keycodes {
-    OLED_TOGGLE = KEYBALL_SAFE_RANGE, // Toggle OLED on/off ,User 0
-    OLED_TOGGLE_INVERT,               // Invert OLED display
+    OL_TGL = KEYBALL_SAFE_RANGE, // Toggle OLED on/off ,User 0
+    OL_TGLINV,                   // Invert OLED display
     MAT_I5, // Increase mouse_activation_threshold by 5
     MAT_D5, // Decrease mouse_activation_threshold by 5
+    RT_LY_TGL, // Reserved.
+};
+
+enum user_tapdance_keycodes {
+    TD_QUOTS,
+    TD_PIPE_TILD,
 };
 
 typedef union {
@@ -71,38 +78,38 @@ static user_state_t user_state = {0};
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // keymap for default (VIA)
   [0] = LAYOUT_universal(
-    KC_Q     , KC_W     , KC_E     , KC_R     , KC_T     ,                            KC_Y     , KC_U     , KC_I     , KC_O     , KC_P     ,
-    KC_A     , KC_S     , KC_D     , KC_F     , KC_G     ,                            KC_H     , KC_J     , KC_K     , KC_L     , KC_MINS  ,
-    KC_Z     , KC_X     , KC_C     , KC_V     , KC_B     ,                            KC_N     , KC_M     , KC_COMM  , KC_DOT   , KC_SLSH  ,
-    KC_LCTL  , KC_LGUI  , KC_LALT  ,LSFT_T(KC_LNG2),LT(1,KC_SPC),LT(3,KC_LNG1),KC_BSPC,LT(2,KC_ENT),LSFT_T(KC_LNG2),KC_RALT,KC_RGUI, KC_RSFT
+    KC_Q     , KC_W     , KC_E     , KC_R     , KC_T     ,                       KC_Y     , KC_U     , KC_I     , KC_O     , KC_P     ,
+    KC_A     , KC_S     , KC_D     , KC_F     , KC_G     ,                       KC_H     , KC_J     , KC_K     , KC_L     , KC_ENTER ,
+    KC_Z     , KC_X     , KC_C     , KC_V     , KC_B     ,                       KC_N     , KC_M     , KC_COMM  , KC_DOT   , KC_SLSH  ,
+    KC_ESC   , KC_LALT  , KC_LGUI  , MO(3)    , KC_SPC   , MO(2)    , MO(1)    , KC_LCTL  , _______  , KC_RALT  , KC_RGUI  , KC_RSFT
   ),
 
   [1] = LAYOUT_universal(
-    KC_F1    , KC_F2    , KC_F3    , KC_F4    , KC_RBRC  ,                            KC_F6    , KC_F7    , KC_F8    , KC_F9    , KC_F10   ,
-    KC_F5    , KC_EXLM  , S(KC_6)  ,S(KC_INT3), S(KC_8)  ,                           S(KC_INT1), KC_BTN1  , KC_PGUP  , KC_BTN2  , KC_SCLN  ,
-    S(KC_EQL),S(KC_LBRC),S(KC_7)   , S(KC_2)  ,S(KC_RBRC),                            KC_LBRC  , KC_DLR   , KC_PGDN  , KC_BTN3  , KC_F11   ,
-    KC_INT1  , KC_EQL   , S(KC_3)  , _______  , _______  , _______  ,      TO(2)    , TO(0)    , _______  , KC_RALT  , KC_RGUI  , KC_F12
+    KC_1     , KC_2     , KC_3     , KC_4     , KC_5     ,                       KC_F1    , KC_F2    , KC_F3    , KC_F4    , KC_F5    ,
+    KC_6     , KC_7     , KC_8     , KC_9     , KC_0     ,                       KC_F6    , KC_F7    , KC_F8    , KC_F9    , KC_F10   ,
+    KC_MINUS ,S(KC_MINS), KC_INT3  , KC_RBRC  , KC_BSLS  ,                    TD(TD_QUOTS), KC_F11   , KC_F12   , KC_F13   ,TD(TD_PIPE_TILD),
+    KC_SCLN  , S(KC_7)  ,S(KC_LBRC), _______  , _______  , _______  , _______  , _______  , _______  , KC_RALT  , KC_RGUI  , _______
   ),
 
   [2] = LAYOUT_universal(
-    KC_TAB   , KC_7     , KC_8     , KC_9     , KC_MINS  ,                            KC_NUHS  , _______  , KC_BTN3  , _______  , KC_BSPC  ,
-   S(KC_QUOT), KC_4     , KC_5     , KC_6     ,S(KC_SCLN),                            S(KC_9)  , KC_BTN1  , KC_UP    , KC_BTN2  , KC_QUOT  ,
-    KC_SLSH  , KC_1     , KC_2     , KC_3     ,S(KC_MINS),                           S(KC_NUHS), KC_LEFT  , KC_DOWN  , KC_RGHT  , _______  ,
-    KC_ESC   , KC_0     , KC_DOT   , KC_DEL   , KC_ENT   , KC_BSPC  ,      _______  , _______  , _______  , _______  , _______  , _______
+    S(KC_1)  , KC_LBRC  , S(KC_3)  , S(KC_4)  , S(KC_5)  ,                       KC_PSCR  , _______  , _______  , KC_BSPC  , KC_DELETE,
+    KC_EQUAL , S(KC_6)  ,S(KC_QUOT), S(KC_8)  , S(KC_9)  ,                       KC_LEFT  , KC_DOWN  , KC_UP    , KC_RIGHT , KC_TAB   ,
+   S(KC_INT1),S(KC_SCLN),S(KC_INT3),S(KC_RBRC),S(KC_BSLS),                       KC_HOME  , KC_PGDN  , KC_PGUP  , KC_END   , KC_GRAVE ,
+    KC_QUOT , S(KC_2)   ,S(KC_EQL) , _______  , _______  , _______  , _______  , _______  , _______  , KC_RALT  , KC_RGUI  , _______
   ),
 
   [3] = LAYOUT_universal(
-    RGB_TOG  , AML_TO   , AML_I50  , AML_D50  , _______  ,                            _______  , _______  , SSNP_HOR , SSNP_VRT , SSNP_FRE ,
-    RGB_MOD  , RGB_HUI  , RGB_SAI  , RGB_VAI  , SCRL_DVI ,                            _______  , _______  , _______  , _______  , _______  ,
-    RGB_RMOD , RGB_HUD  , RGB_SAD  , RGB_VAD  , SCRL_DVD ,                            CPI_D1K  , CPI_D100 , CPI_I100 , CPI_I1K  , KBC_SAVE ,
-    QK_BOOT  , KBC_RST  , _______  , _______  , _______  , _______  ,      _______  , _______  , _______  , _______  , KBC_RST  , QK_BOOT
+    AML_TO   , SCRL_TO  , CPI_I100 , SSNP_VRT , QK_BOOT  ,                       QK_BOOT  , RT_LY_TGL, AS_TOGG  , _______  , QK_RBT   ,
+    AML_I50  , SCRL_MO  , CPI_D100 , SSNP_HOR , KBC_RST  ,                       OL_TGL   , MAT_I5   , AS_UP    , _______  , _______  ,
+    AML_D50  , SCRL_DVI , CPI_I1K  , SSNP_FRE , KBC_SAVE ,                       OL_TGLINV, MAT_D5   , AS_DOWN  , _______  , _______  ,
+    _______  , SCRL_DVD , CPI_D1K  , _______  , _______  , _______  , _______  , _______  , _______  , _______  , _______  , _______
   ),
 
   [4] = LAYOUT_universal(
-    _______  , _______  , _______  , _______  , _______  ,                            _______  , KC_F3    , KC_F5    , KC_F12   , _______  ,
-    _______  , KC_LSFT  , KC_LCTL  , KC_LALT  , _______  ,                            KC_LEFT  , KC_BTN1  , KC_BTN3  , KC_BTN2  , KC_RGHT  ,
-    _______  , _______  , _______  , _______  , _______  ,                            _______  , _______  , _______  , _______  , _______  ,
-    _______  , _______  , _______  , _______  , _______  , _______  ,      _______  , TO(0)    , _______  , _______  , _______  , _______
+    _______  , _______  , _______  , _______  , _______  ,                       _______  , KC_F3    , KC_F5    , KC_F12   , _______  ,
+    _______  , KC_LSFT  , KC_LCTL  , KC_LALT  , _______  ,                      A(KC_LEFT), KC_BTN1  , KC_BTN3  , KC_BTN2  ,A(KC_RGHT),
+    _______  , _______  , _______  , _______  , _______  ,                       KC_LEFT  , KC_DOWN  , KC_UP    , KC_RIGHT , _______  ,
+    _______  , _______  , _______  , _______  , _______  , _______  , _______  , TO(0)    , _______  , _______  , _______  , _______
   ),
 };
 // clang-format on
@@ -468,10 +475,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         // TODO Update oled timer if oled is on.
         switch (keycode) {
 #ifdef OLED_ENABLE
-            case OLED_TOGGLE:
+            case OL_TGL:
                 oled_on_user(!user_state.oled_on);
                 break;
-            case OLED_TOGGLE_INVERT:
+            case OL_TGLINV:
                 user_state.oled_inversion = !user_state.oled_inversion;
                 user_state.oled_inversion_changed = true;
                 oled_invert(user_state.oled_inversion);
@@ -523,11 +530,6 @@ combo_t key_combos[] = {
 #ifdef TAP_DANCE_ENABLE
 
 // Japanese keyboard specific characters
-
-enum {
-    TD_QUOTS,
-    TD_PIPE_TILD,
-};
 
 static void td_quot_handler(tap_dance_state_t *state, void *user_data) {
     // 1 tap: ' , 2 taps: " , 3+ taps: `
