@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="ja">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Overlay Settings</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0c1116;
+      --panel: #121a27;
+      --panel-border: #233247;
+      --text: #e6edf7;
+      --muted: #91a0b8;
+      --accent: #7ce7ff;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background: #0b111c;
+      color: var(--text);
+      font-family: "SF Pro Display", "Segoe UI", "Noto Sans JP", system-ui, -apple-system, sans-serif;
+    }
+    body {
+      display: grid;
+      place-items: center;
+      padding: 16px;
+    }
+    .card {
+      width: min(320px, 92vw);
+      padding: 14px;
+      border-radius: 12px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .field-grid {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+    .field label {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+    .field input {
+      border: 1px solid #223149;
+      border-radius: 8px;
+      background: #0f1623;
+      color: #dce6f5;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+    .status {
+      min-height: 16px;
+      font-size: 12px;
+      color: #f3b67f;
+      margin-bottom: 8px;
+    }
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+    }
+    .actions button {
+      border: 1px solid #2b3b52;
+      background: #111a29;
+      color: #cfe1ff;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body data-tauri-drag-region>
+  <div class="card" data-tauri-drag-region>
+    <h1>HID Settings</h1>
+    <div class="field-grid">
+      <div class="field">
+        <label for="vendor-id">Vendor ID</label>
+        <input id="vendor-id" type="text" inputmode="numeric" placeholder="0x5957">
+      </div>
+      <div class="field">
+        <label for="product-id">Product ID</label>
+        <input id="product-id" type="text" inputmode="numeric" placeholder="0x0200">
+      </div>
+      <div class="field">
+        <label for="usage-page">Usage Page</label>
+        <input id="usage-page" type="text" inputmode="numeric" placeholder="0xFF60">
+      </div>
+      <div class="field">
+        <label for="usage">Usage</label>
+        <input id="usage" type="text" inputmode="numeric" placeholder="0x0061">
+      </div>
+    </div>
+    <div class="status" id="settings-status"></div>
+    <div class="actions">
+      <button id="settings-close" type="button">閉じる</button>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const vendorIdInput = document.getElementById("vendor-id");
+      const productIdInput = document.getElementById("product-id");
+      const usagePageInput = document.getElementById("usage-page");
+      const usageInput = document.getElementById("usage");
+      const closeButton = document.getElementById("settings-close");
+      const status = document.getElementById("settings-status");
+      const invoke = window.__TAURI__.core.invoke;
+
+      function toHex(value) {
+        return `0x${value.toString(16).padStart(4, "0")}`;
+      }
+
+      function parseValue(value) {
+        if (typeof value !== "string") return null;
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+        const parsed = trimmed.toLowerCase().startsWith("0x")
+          ? Number.parseInt(trimmed, 16)
+          : Number.parseInt(trimmed, 10);
+        if (Number.isNaN(parsed) || parsed < 0 || parsed > 0xffff) return null;
+        return parsed;
+      }
+
+      function showStatus(message) {
+        if (!status) return;
+        status.textContent = message;
+      }
+
+      async function loadHidSettings() {
+        if (!invoke) return;
+        try {
+          const current = await invoke("get_hid_settings");
+          vendorIdInput.value = toHex(current.vendor_id);
+          productIdInput.value = toHex(current.product_id);
+          usagePageInput.value = toHex(current.usage_page);
+          usageInput.value = toHex(current.usage);
+        } catch (err) {
+          console.error("Failed to load HID settings", err);
+        }
+      }
+
+      async function updateHidSettings() {
+        if (!invoke) return;
+        try {
+          const vendorId = parseValue(vendorIdInput.value);
+          const productId = parseValue(productIdInput.value);
+          const usagePage = parseValue(usagePageInput.value);
+          const usage = parseValue(usageInput.value);
+          if (
+            vendorId === null ||
+            productId === null ||
+            usagePage === null ||
+            usage === null
+          ) {
+            showStatus("16進数(0x...)または10進数で入力してください。");
+            return;
+          }
+          showStatus("");
+          await invoke("set_hid_settings", {
+            settings: {
+              vendor_id: vendorId,
+              product_id: productId,
+              usage_page: usagePage,
+              usage: usage,
+            },
+          });
+        } catch (err) {
+          console.error("Failed to set HID settings", err);
+        }
+      }
+
+      async function closeSettings() {
+        if (!invoke) return;
+        try {
+          await invoke("hide_settings_window");
+          window.close();
+        } catch (err) {
+          console.error("Failed to hide settings window", err);
+        }
+      }
+
+      [vendorIdInput, productIdInput, usagePageInput, usageInput].forEach(
+        (input) => {
+          if (!input) return;
+          input.addEventListener("change", () => {
+            updateHidSettings();
+          });
+        }
+      );
+
+      closeButton.addEventListener("click", () => {
+        closeSettings();
+      });
+
+      loadHidSettings();
+    })();
+  </script>
+</body>
+</html>

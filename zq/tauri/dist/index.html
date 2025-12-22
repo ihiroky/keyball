@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ja">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Keyball Layer Overlay</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0c1116;
+      --panel: #111927;
+      --panel-border: #1f2a3a;
+      --text: #e6edf7;
+      --muted: #7f8aa2;
+      --accent: #7ce7ff;
+    }
+    * { box-sizing: border-box; }
+    html { background: transparent; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "SF Pro Display", "Segoe UI", "Noto Sans JP", system-ui, -apple-system, sans-serif;
+      background: transparent;
+      color: var(--text);
+      display: grid;
+      place-items: center;
+    }
+
+    /* Overlay */
+    #layer-overlay {
+      position: relative;
+      pointer-events: none;
+      opacity: 0.7;
+      transform: scale(1);
+    }
+    .bubble {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      gap: 12px;
+      background: rgba(11, 17, 26, 0.92);
+      border: 1px solid #1f2f44;
+      border-radius: 14px;
+      padding: 10px 12px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(124,231,255,0.08);
+      backdrop-filter: blur(6px);
+    }
+    .layer-number {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(145deg, #7ce7ff, #4cbde5);
+      color: #05101d;
+      font-weight: 800;
+      font-size: 18px;
+      display: grid;
+      place-items: center;
+      box-shadow: 0 8px 24px rgba(124,231,255,0.35);
+    }
+    .layer-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 120px;
+    }
+    .layer-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #a6b3ca; }
+    .layer-desc { font-weight: 600; color: #e8f2ff; }
+  </style>
+</head>
+<body data-tauri-drag-region>
+  <div id="layer-overlay" aria-live="polite" aria-atomic="true">
+    <div class="bubble">
+      <div class="layer-number" id="layer-number">-</div>
+      <div class="layer-meta">
+        <div class="layer-label" hidden>Active : </div>
+        <div class="layer-desc" id="layer-desc">Waiting…</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const layerNum = document.getElementById("layer-number");
+      const layerDesc = document.getElementById("layer-desc");
+      const layerLabel = document.querySelector(".layer-label");
+
+      function showLayer(payload) {
+        console.log(payload);
+        const layer = Number(payload?.highest_layer);
+        if (!Number.isFinite(layer)) return;
+
+        const maskValue = Number(payload?.mask);
+        const version = payload?.version ?? "-";
+
+        layerNum.textContent = layer;
+        if (layerLabel?.hidden) layerLabel.hidden = false;
+        const normalizedMask = Number.isFinite(maskValue) ? maskValue : 0;
+        const activeLayers = [];
+        for (let i = 0; i < 8; i += 1) {
+          if ((normalizedMask >> i) & 1) activeLayers.push(i);
+        }
+        layerDesc.textContent = activeLayers.length ? activeLayers.join(", ") : "-";
+
+      }
+
+      window.__TAURI__.event.listen("zq://hid/layer_state", (ev) => showLayer(ev?.payload));
+    })();
+  </script>
+</body>
+</html>
