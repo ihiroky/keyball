@@ -36,8 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 const uint16_t MOUSE_ACTIVATION_THRESHOLD_MIN = 5;
 const uint16_t MOUSE_ACTIVATION_THRESHOLD_MAX = 155;
 const uint16_t MOUSE_ACTIVATION_THRESHOLD_QU = 5;
-const uint16_t AUTO_SHIFT_TIMEOUT_MIN = 50;
-const uint16_t AUTO_SHIFT_TIMEOUT_MAX = 360;
+const uint16_t AUTO_SHIFT_TIMEOUT_MIN = 100;
+const uint16_t AUTO_SHIFT_TIMEOUT_MAX = 250;
 const uint16_t AUTO_SHIFT_TIMEOUT_QU  = 5;   // Quantization Unit
 
 enum user_keycodes {
@@ -45,7 +45,9 @@ enum user_keycodes {
     OL_TGLINV,                   // Invert OLED display
     MAT_I5, // Increase mouse_activation_threshold by 5
     MAT_D5, // Decrease mouse_activation_threshold by 5
-    RT_LY_TGL, // Reserved.
+    // TODO swap positions below. (User4 <-> User5)
+    RT_LY_TGL, // Layer state report toggle
+    AMLY_TGL, // Toggle auto mouse layer
 };
 
 enum user_tapdance_keycodes {
@@ -69,13 +71,15 @@ typedef union {
 #else
         uint32_t keyball_reserved : 20;
 #endif
+        uint8_t  auto_mouse_layer_enabled : 1;
         uint16_t mouse_activation_threshold : 5;
         uint8_t  autoshift_enabled : 1;
-        uint16_t autoshift_timeout : 6;
+        uint16_t autoshift_timeout : 5;
     };
 } user_config_t;
 
 typedef struct {
+    bool auto_mouse_layer_enabled;
     uint16_t mouse_activation_threshold;
 #ifdef OLED_ENABLE
     bool oled_on;
@@ -117,9 +121,9 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   ),
 
   [3] = LAYOUT_universal(
-    AML_TO   , SCRL_TO  , CPI_I100 , SSNP_VRT , QK_BOOT  ,                       QK_BOOT  , RT_LY_TGL, AS_TOGG  , _______  , QK_RBT   ,
+    AML_TO   , SCRL_TO  , CPI_I100 , SSNP_VRT , QK_BOOT  ,                       QK_BOOT  , AMLY_TGL , AS_TOGG  , _______  , QK_RBT   ,
     AML_I50  , SCRL_MO  , CPI_D100 , SSNP_HOR , KBC_RST  ,                       OL_TGL   , MAT_I5   , AS_UP    , _______  , _______  ,
-    AML_D50  , SCRL_DVI , CPI_I1K  , SSNP_FRE , KBC_SAVE ,                       OL_TGLINV, MAT_D5   , AS_DOWN  , _______  , _______  ,
+    AML_D50  , SCRL_DVI , CPI_I1K  , SSNP_FRE , KBC_SAVE ,                       OL_TGLINV, MAT_D5   , AS_DOWN  , RT_LY_TGL, _______  ,
     _______  , SCRL_DVD , CPI_D1K  , _______  , _______  , _______  , _______  , _______  , _______  , _______  , _______  , _______
   ),
 
@@ -234,13 +238,16 @@ static inline bool is_mouse_layer_active(void) {
     return mouse_layer_state.active && layer_state_is(MOUSE_LAYER);
 }
 
-static void mouse_layer_return_to_default(void) {
+static void reset_mouse_layer_state(void) {
     mouse_layer_state.active          = false;
     mouse_layer_state.btn1_pressed    = false;
     mouse_layer_state.btn1_timer      = 0;
     mouse_layer_state.btn1_waiting_return = false;
     mouse_layer_state.motion_accum    = 0;
+}
 
+static void mouse_layer_return_to_default(void) {
+    reset_mouse_layer_state();
     layer_move(DEFAULT_LAYER);
 }
 
@@ -265,7 +272,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         mouse_layer_state.active = false;
     }
 
-    if (!mouse_layer_state.active && mouse_motion_exceeds_threshold(&mouse_report)) {
+    if (user_state.auto_mouse_layer_enabled && !mouse_layer_state.active && mouse_motion_exceeds_threshold(&mouse_report)) {
         layer_on(MOUSE_LAYER);
         mouse_layer_state.active = true;
     }
@@ -363,18 +370,27 @@ static const char *format_4d(int8_t d) {
     return buf;
 }
 
+static const char *format_u3d(uint8_t d) {
+    static char buf[4] = {0}; // max width (3) + NUL (1)
+    buf[2] = (d % 10) + '0';
+    d /= 10;
+    if (d == 0) {
+        buf[1] = ' ';
+    } else {
+        buf[1] = (d % 10) + '0';
+        d /= 10;
+    }
+    if (d == 0) {
+        buf[0] = ' ';
+    } else {
+        buf[0] = (d % 10) + '0';
+    }
+    return buf;
+}
+
 static char to_1x(uint8_t x) {
     x &= 0x0f;
     return x < 10 ? x + '0' : x + 'a' - 10;
-}
-
-static void oled_write_timeout4(uint16_t timeout) {
-    oled_write(format_4d(timeout / 10) + 1, false);
-    oled_write_char((char) ('0' + (timeout % 10)), false);
-}
-
-static void oled_write_timeout3(uint16_t timeout) {
-    oled_write(format_4d(timeout) + 1, false);
 }
 
 #define BL ((char)0xB0)
@@ -397,11 +413,7 @@ void oled_render_ball_misc_info(void) {
     oled_write(format_4d(keyball.last_mouse.v), false);
 
     // 2nd line, empty label and CPI
-#ifndef RAW_ENABLE
-    oled_write_P(PSTR("    \xB1\xBC\xBD"), false);
-#else
     oled_write_P(PSTR("\xBC\xBD"), false);
-#endif
     oled_write(format_4d(keyball_get_cpi()) + 1, false);
     oled_write_P(PSTR("00 "), false);
 
@@ -433,46 +445,38 @@ void oled_render_ball_misc_info(void) {
     oled_write_char('0' + keyball_get_scroll_div(), false);
 
     // layer report
-#ifdef RAW_ENABLE
-    oled_write_P(PSTR(" \xC8\xC9"), false);
+    oled_write_P(PSTR(" \xC6\xC7"), false);
     if (user_state.raw_hid_layer_report_enabled) {
         oled_write_P(LFSTR_ON, false);
     } else {
         oled_write_P(LFSTR_OFF, false);
     }
 #endif
-#endif
 }
 
 void oled_render_layer_misc_info(void) {
     oled_write_char('L', false);
-    for (uint8_t i = 1; i < 6; i++) {
+    for (uint8_t i = 1; i <= 4; i++) {
         oled_write_char((layer_state_is(i) ? to_1x(i) : BL), false);
     }
     oled_write_char(' ', false);
 
-    oled_write_P(PSTR("\xC6\xC7"), false);
-    oled_write_timeout3(user_state.mouse_activation_threshold);
-    oled_write_char(' ', false);
-
-#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     oled_write_P(PSTR("\xC2\xC3"), false);
-    if (get_auto_mouse_enable()) {
+    if (user_state.auto_mouse_layer_enabled) {
         oled_write_P(LFSTR_ON, false);
     } else {
         oled_write_P(LFSTR_OFF, false);
     }
+    oled_write(format_u3d(user_state.mouse_activation_threshold), false);
+    oled_write_char(' ', false);
 
-    oled_write_timeout4(get_auto_mouse_timeout());
-#    else
     oled_write_P(PSTR("\xC4\xC5"), false);
     if (get_autoshift_state()) {
         oled_write_P(LFSTR_ON, false);
     } else {
         oled_write_P(LFSTR_OFF, false);
     }
-    oled_write_timeout4(get_generic_autoshift_timeout());
-#    endif
+    oled_write(format_u3d(get_generic_autoshift_timeout()), false);
 }
 
 void oled_on_user(bool on) {
@@ -507,8 +511,17 @@ void oledkit_render_info_user(void) {
         return;
     }
     keyball_oled_render_keyinfo();
+#ifndef RAW_ENABLE
+    keyball_oled_render_ballinfo();
+#else
     oled_render_ball_misc_info();
+#endif
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    keyball_oled_render_layerinfo();
+#else
     oled_render_layer_misc_info();
+#endif
+
 }
 
 void oledkit_render_logo_user(void) {
@@ -550,6 +563,7 @@ void keyball_keyboard_post_init_eeconfig_user(uint32_t raw) {
     user_state.mouse_activation_threshold = (c.mouse_activation_threshold == 0)
         ? MOUSE_ACTIVATION_THRESHOLD
         : c.mouse_activation_threshold * MOUSE_ACTIVATION_THRESHOLD_QU;
+    user_state.auto_mouse_layer_enabled = c.auto_mouse_layer_enabled ? true : false;
 
 #ifdef OLED_ENABLE
     user_state.oled_inversion = c.oled_inversion ? true : false;
@@ -590,6 +604,7 @@ uint32_t keyball_process_record_eeconfig_user(uint32_t raw) {
     user_config_t c = { .raw = raw };
 
     c.mouse_activation_threshold = user_state.mouse_activation_threshold / MOUSE_ACTIVATION_THRESHOLD_QU;
+    c.auto_mouse_layer_enabled = user_state.auto_mouse_layer_enabled ? 1 : 0;
 
 #ifdef OLED_ENABLE
     c.oled_inversion = user_state.oled_inversion ? 1 : 0;
@@ -634,6 +649,18 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     user_state.mouse_activation_threshold = MAX(v, MOUSE_ACTIVATION_THRESHOLD_MIN);
                 }
                 break;
+            case AMLY_TGL:
+                user_state.auto_mouse_layer_enabled = !user_state.auto_mouse_layer_enabled;
+#ifndef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+                if (!user_state.auto_mouse_layer_enabled) {
+                    if (layer_state_is(MOUSE_LAYER)) {
+                        mouse_layer_return_to_default();
+                    } else {
+                        reset_mouse_layer_state();
+                    }
+                }
+#endif
+                break;
 #ifdef RAW_ENABLE
             case RT_LY_TGL:
                 user_state.raw_hid_layer_report_enabled = !user_state.raw_hid_layer_report_enabled;
@@ -653,19 +680,19 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 #ifdef COMBO_ENABLE
 
-const uint16_t PROGMEM esc_combo[] = {KC_Q, KC_F, COMBO_END};
-const uint16_t PROGMEM tab_combo[] = {KC_A, KC_F, COMBO_END};
-const uint16_t PROGMEM del_combo[] = {KC_ENTER, KC_J, COMBO_END};
-const uint16_t PROGMEM bsp_combo[] = {KC_L, KC_J, COMBO_END};
-const uint16_t PROGMEM spc_combo[] = {KC_K, KC_J, COMBO_END};
+const uint16_t PROGMEM jk_lclick_combo[] = {KC_J, KC_K, COMBO_END};
+const uint16_t PROGMEM kl_rclick_combo[] = {KC_K, KC_L, COMBO_END};
+const uint16_t PROGMEM jl_mclick_combo[] = {KC_J, KC_L, COMBO_END};
+const uint16_t PROGMEM mcomm_back_combo[] = {KC_M, KC_COMM, COMBO_END};
+const uint16_t PROGMEM commdot_fwd_combo[] = {KC_COMM, KC_DOT, COMBO_END};
 
 
 combo_t key_combos[] = {
-    COMBO(esc_combo, KC_ESC),
-    COMBO(tab_combo, KC_TAB),
-    COMBO(del_combo, KC_DEL),
-    COMBO(bsp_combo, KC_BSPC),
-    COMBO(spc_combo, KC_SPC),
+    COMBO(jk_lclick_combo, KC_BTN1),
+    COMBO(kl_rclick_combo, KC_BTN2),
+    COMBO(jl_mclick_combo, KC_BTN3),
+    COMBO(mcomm_back_combo, A(KC_LEFT)),
+    COMBO(commdot_fwd_combo, A(KC_RIGHT)),
 };
 
 #endif
