@@ -41,4 +41,4 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #undef  OLED_FONT_END
 #define OLED_FONT_H "keyboards/keyball/keyball39/keymaps/myvia/logofont/logofont.c"
 #define OLED_FONT_START 32 // 0x20
-#define OLED_FONT_END 201  // 0xC9
+#define OLED_FONT_END 199  // 0xC7jkQ
