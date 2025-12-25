@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
 #define TAPPING_TERM 175
-#define AUTO_SHIFT_TIMEOUT 175
+#define AUTO_SHIFT_TIMEOUT 150
 #define AUTO_SHIFT_REPEAT
 #define NO_ACTION_ONESHOT
 
@@ -41,4 +41,4 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #undef  OLED_FONT_END
 #define OLED_FONT_H "keyboards/keyball/keyball39/keymaps/myvia/logofont/logofont.c"
 #define OLED_FONT_START 32 // 0x20
-#define OLED_FONT_END 199  // 0xC7jkQ
+#define OLED_FONT_END 199  // 0xC7
