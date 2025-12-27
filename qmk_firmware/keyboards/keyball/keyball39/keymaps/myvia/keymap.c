@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MOUSE_LAYER 4
 #define MOUSE_ACTIVATION_THRESHOLD 10
 #define MOUSE_BTN1_RETURN_TERM TAPPING_TERM
-#define BTN_THRESHOLD 50
+#define BTN_THRESHOLD 100
 
 const uint16_t MOUSE_ACTIVATION_THRESHOLD_MIN = 5;
 const uint16_t MOUSE_ACTIVATION_THRESHOLD_MAX = 155;
@@ -47,32 +47,21 @@ enum user_keycodes {
     OL_TGLINV,                   // Invert OLED display
     MAT_I5, // Increase mouse_activation_threshold by 5
     MAT_D5, // Decrease mouse_activation_threshold by 5
-    // TODO swap positions below. (User4 <-> User5)
-    RT_LY_TGL, // Layer state report toggle
     AMLY_TGL, // Toggle auto mouse layer
+    RT_LY_TGL, // Layer state report toggle
 };
 
 enum user_tapdance_keycodes {
-    TD_QUOTS,
-    TD_PIPE_TILD,
+    TDKC_QUOTS,
+    TDKC_PIPE_TILD,
 };
 
 typedef union {
     uint32_t raw;
     struct {
-#if defined(OLED_ENABLE) && defined(RAW_ENABLE)
         uint32_t keyball_reserved : 18;
         uint8_t  report_layer_state : 1;
         uint8_t  oled_inversion : 1;
-#elif defined(OLED_ENABLE) && !defined(RAW_ENABLE)
-        uint32_t keyball_reserved : 19;
-        uint8_t  oled_inversion : 1;
-#elif !defined(OLED_ENABLE) && defined(RAW_ENABLE)
-        uint32_t keyball_reserved : 19;
-        uint8_t  report_layer_state : 1;
-#else
-        uint32_t keyball_reserved : 20;
-#endif
         uint8_t  auto_mouse_layer_enabled : 1;
         uint16_t mouse_activation_threshold : 5;
         uint8_t  autoshift_enabled : 1;
@@ -89,7 +78,7 @@ typedef struct {
     bool oled_inversion;
     bool oled_inversion_changed;
 #endif
-#ifdef RAW_ENABLE
+#if defined(RAW_ENABLE) && defined(HID_REPORT_ENABLE)
     uint8_t last_highest_layer;
     layer_state_t last_layer_state;
     bool raw_hid_layer_report_enabled;
@@ -104,79 +93,51 @@ typedef struct {
     uint16_t press_timer;
     int16_t x_accum;
     int16_t y_accum;
-} btn_state_t;
+    struct {
+        uint16_t forward;
+        uint16_t backward;
+        uint16_t left;
+        uint16_t right;
+    } motion_codes;
+} tb_gesture_t;
 
-static btn_state_t btn2_state = {0};
-static btn_state_t btn3_state = {0};
-
-typedef struct {
-    uint16_t forward;
-    uint16_t backward;
-    uint16_t left;
-    uint16_t right;
-} btn_motion_codes_t;
-
-static const btn_motion_codes_t btn3_motion_codes = {
-    .forward = C(KC_EQUAL),
-    .backward = C(S(KC_MINS)),
-    .left = C(KC_0),
-    .right = C(KC_0),
-};
-
-static const btn_motion_codes_t btn2_motion_codes_nonwin = {
-    .forward = KC_NO,
-    .backward = KC_NO,
-    .left = LGUI(KC_PGDN),
-    .right = LGUI(KC_PGUP),
-};
-
-#ifdef OS_DETECTION_ENABLE
-static const btn_motion_codes_t btn2_motion_codes_win = {
-    .forward = KC_NO,
-    .backward = KC_NO,
-    .left = C(G(KC_LEFT)),
-    .right = C(G(KC_RIGHT)),
-};
-#endif
-
-static const btn_motion_codes_t *btn2_motion_codes_for_host(void) {
-#ifdef OS_DETECTION_ENABLE
-    if (detected_host_os() == OS_WINDOWS) {
-        return &btn2_motion_codes_win;
-    }
-#endif
-    return &btn2_motion_codes_nonwin;
-}
+static tb_gesture_t btn2_tb_gesture = {0};
+static tb_gesture_t btn3_tb_gesture = {0};
 
 // clang-format off
+#define LA_TAB LALT_T(KC_TAB)
+#define LS_SPC LSFT_T(KC_SPC)
+#define TD_QUOTS  TD(TDKC_QUOTS)
+#define TD_PP_TLD TD(TDKC_PIPE_TILD)
+
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // keymap for default (VIA)
   [0] = LAYOUT_universal(
     KC_Q     , KC_W     , KC_E     , KC_R     , KC_T     ,                       KC_Y     , KC_U     , KC_I     , KC_O     , KC_P     ,
     KC_A     , KC_S     , KC_D     , KC_F     , KC_G     ,                       KC_H     , KC_J     , KC_K     , KC_L     , KC_ENTER ,
     KC_Z     , KC_X     , KC_C     , KC_V     , KC_B     ,                       KC_N     , KC_M     , KC_COMM  , KC_DOT   , KC_SLSH  ,
-    KC_ESC   ,LALT_T(KC_TAB),KC_LGUI,MO(3)    , KC_SPC   , MO(2)    , MO(1)    , KC_LCTL  , _______  , KC_RALT  , KC_RGUI  , KC_RSFT
+    KC_ESC   , LA_TAB   , KC_LGUI  , MO(3)    , LS_SPC   , MO(2)    , MO(1)    , KC_LCTL  , _______  , _______  , _______  , KC_RSFT
   ),
 
   [1] = LAYOUT_universal(
     KC_1     , KC_2     , KC_3     , KC_4     , KC_5     ,                       KC_F1    , KC_F2    , KC_F3    , KC_F4    , KC_F5    ,
     KC_6     , KC_7     , KC_8     , KC_9     , KC_0     ,                       KC_F6    , KC_F7    , KC_F8    , KC_F9    , KC_F10   ,
-    KC_MINUS ,S(KC_MINS), KC_INT3  , KC_RBRC  , KC_BSLS  ,                    TD(TD_QUOTS), KC_F11   , KC_F12   , KC_F13   ,TD(TD_PIPE_TILD),
-    KC_SCLN  , S(KC_7)  ,S(KC_LBRC), _______  , _______  , _______  , _______  , _______  , _______  , KC_RALT  , KC_RGUI  , _______
+    KC_MINUS ,S(KC_MINS), KC_INT3  , KC_RBRC  , KC_BSLS  ,                       TD_QUOTS , KC_F11   , KC_F12   , KC_F13   , TD_PP_TLD,
+    KC_SCLN  , S(KC_7)  ,S(KC_LBRC), KC_BSPC  , KC_TAB   , KC_DEL   , _______  , _______  , _______  , _______  , _______  , _______
   ),
 
   [2] = LAYOUT_universal(
-    S(KC_1)  , KC_LBRC  , S(KC_3)  , S(KC_4)  , S(KC_5)  ,                       KC_PSCR  , _______  , _______  , KC_BSPC  , KC_DELETE,
-    KC_EQUAL , S(KC_6)  ,S(KC_QUOT), S(KC_8)  , S(KC_9)  ,                       KC_LEFT  , KC_DOWN  , KC_UP    , KC_RIGHT , KC_TAB   ,
-   S(KC_INT1),S(KC_SCLN),S(KC_INT3),S(KC_RBRC),S(KC_BSLS),                       KC_HOME  , KC_PGDN  , KC_PGUP  , KC_END   , KC_GRAVE ,
-    KC_QUOT , S(KC_2)   ,S(KC_EQL) , _______  , _______  , _______  , _______  , _______  , _______  , KC_RALT  , KC_RGUI  , _______
+    S(KC_1)  , KC_LBRC  , S(KC_3)  , S(KC_4)  , S(KC_5)  ,                       KC_PSCR  , KC_BRID  , KC_BRIU  , KC_MUTE  , KC_VOLU  ,
+    KC_EQUAL , S(KC_6)  ,S(KC_QUOT), S(KC_8)  , S(KC_9)  ,                       KC_LEFT  , KC_DOWN  , KC_UP    , KC_RIGHT , KC_VOLD  ,
+   S(KC_INT1),S(KC_SCLN),S(KC_INT3),S(KC_RBRC),S(KC_BSLS),                       KC_HOME  , KC_PGDN  , KC_PGUP  , KC_END   , KC_F20   ,
+    KC_QUOT , S(KC_2)   ,S(KC_EQL) , _______  , _______  , _______  , KC_RALT  , _______  , _______  , _______  , _______  , _______
   ),
 
   [3] = LAYOUT_universal(
     AML_TO   , SCRL_TO  , CPI_I100 , SSNP_VRT , QK_BOOT  ,                       QK_BOOT  , AMLY_TGL , AS_TOGG  , _______  , QK_RBT   ,
     AML_I50  , SCRL_MO  , CPI_D100 , SSNP_HOR , KBC_RST  ,                       OL_TGL   , MAT_I5   , AS_UP    , _______  , _______  ,
-    AML_D50  , SCRL_DVI , CPI_I1K  , SSNP_FRE , KBC_SAVE ,                       OL_TGLINV, MAT_D5   , AS_DOWN  , RT_LY_TGL, _______  ,
-    _______  , SCRL_DVD , CPI_D1K  , _______  , _______  , _______  , _______  , _______  , _______  , _______  , _______  , _______
+    AML_D50  , SCRL_DVI , CPI_I1K  , SSNP_FRE , KBC_SAVE ,                       OL_TGLINV, MAT_D5   , AS_DOWN  , RT_LY_TGL, KC_GRAVE ,
+    _______  , SCRL_DVD , CPI_D1K  , _______  , _______  , _______  , KC_INT4  , KC_INT5  , _______  , _______  , _______  , _______
   ),
 
   [4] = LAYOUT_universal(
@@ -191,7 +152,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 // Send highest active layer and bitmask via RAW HID; optionally bypass dedupe.
 // NOTE: intentionally limit reported layers to 0-7 to keep protocol/UI simple.
 static void send_layer_report(layer_state_t state, bool force) {
-#ifdef RAW_ENABLE
+#if defined(RAW_ENABLE) && defined(HID_REPORT_ENABLE)
     if (!is_keyboard_master()) {
         return;
     }
@@ -219,7 +180,7 @@ static void send_layer_report(layer_state_t state, bool force) {
 #endif
 }
 
-#if defined(RAW_ENABLE) && !defined(VIA_ENABLE)
+#if defined(RAW_ENABLE) && defined(HID_REPORT_ENABLE) && !defined(VIA_ENABLE)
 void raw_hid_receive(uint8_t *data, uint8_t length) {
     if (!is_keyboard_master()) {
         return;
@@ -317,7 +278,7 @@ static void mouse_layer_maybe_return(void) {
     }
 }
 
-static void btn_update_hold_state(btn_state_t *state) {
+static void tb_gesture_update_hold_state(tb_gesture_t *state) {
     if (state->pressed && !state->held &&
         timer_elapsed(state->press_timer) >= TAPPING_TERM) {
         state->held = true;
@@ -326,7 +287,7 @@ static void btn_update_hold_state(btn_state_t *state) {
     }
 }
 
-static void btn_handle_key(btn_state_t *state, uint16_t keycode, keyrecord_t *record) {
+static void tb_gesture_handle_key(tb_gesture_t *state, uint16_t keycode, keyrecord_t *record) {
     if (record->event.pressed) {
         state->pressed = true;
         state->held = false;
@@ -334,7 +295,7 @@ static void btn_handle_key(btn_state_t *state, uint16_t keycode, keyrecord_t *re
         state->x_accum = 0;
         state->y_accum = 0;
     } else {
-        btn_update_hold_state(state);
+        tb_gesture_update_hold_state(state);
         state->pressed = false;
         if (!state->held) {
             tap_code16(keycode);
@@ -345,7 +306,7 @@ static void btn_handle_key(btn_state_t *state, uint16_t keycode, keyrecord_t *re
     }
 }
 
-static void btn_handle_motion(btn_state_t *state, const btn_motion_codes_t *codes, report_mouse_t *mouse_report) {
+static void tb_gesture_handle_motion(tb_gesture_t *state, report_mouse_t *mouse_report) {
     if (!state->held) {
         return;
     }
@@ -354,13 +315,13 @@ static void btn_handle_motion(btn_state_t *state, const btn_motion_codes_t *code
         state->x_accum += mouse_report->x;
         while (state->x_accum >= BTN_THRESHOLD || state->x_accum <= -BTN_THRESHOLD) {
             if (state->x_accum > 0) {
-                if (codes->right != KC_NO) {
-                    tap_code16(codes->right);
+                if (state->motion_codes.right != KC_NO) {
+                    tap_code16(state->motion_codes.right);
                 }
                 state->x_accum -= BTN_THRESHOLD;
             } else {
-                if (codes->left != KC_NO) {
-                    tap_code16(codes->left);
+                if (state->motion_codes.left != KC_NO) {
+                    tap_code16(state->motion_codes.left);
                 }
                 state->x_accum += BTN_THRESHOLD;
             }
@@ -371,19 +332,20 @@ static void btn_handle_motion(btn_state_t *state, const btn_motion_codes_t *code
         state->y_accum += mouse_report->y;
         while (state->y_accum >= BTN_THRESHOLD || state->y_accum <= -BTN_THRESHOLD) {
             if (state->y_accum > 0) {
-                if (codes->backward != KC_NO) {
-                    tap_code16(codes->backward);
+                if (state->motion_codes.backward != KC_NO) {
+                    tap_code16(state->motion_codes.backward);
                 }
                 state->y_accum -= BTN_THRESHOLD;
             } else {
-                if (codes->forward != KC_NO) {
-                    tap_code16(codes->forward);
+                if (state->motion_codes.forward != KC_NO) {
+                    tap_code16(state->motion_codes.forward);
                 }
                 state->y_accum += BTN_THRESHOLD;
             }
         }
     }
 
+    // Stop Oocursor.
     mouse_report->x = 0;
     mouse_report->y = 0;
     mouse_report->h = 0;
@@ -397,10 +359,10 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         mouse_layer_state.active = false;
     }
 
-    btn_update_hold_state(&btn2_state);
-    btn_handle_motion(&btn2_state, btn2_motion_codes_for_host(), &mouse_report);
-    btn_update_hold_state(&btn3_state);
-    btn_handle_motion(&btn3_state, &btn3_motion_codes, &mouse_report);
+    tb_gesture_update_hold_state(&btn2_tb_gesture);
+    tb_gesture_handle_motion(&btn2_tb_gesture, &mouse_report);
+    tb_gesture_update_hold_state(&btn3_tb_gesture);
+    tb_gesture_handle_motion(&btn3_tb_gesture, &mouse_report);
 
     if (user_state.auto_mouse_layer_enabled && !mouse_layer_state.active && mouse_motion_exceeds_threshold(&mouse_report)) {
         layer_on(MOUSE_LAYER);
@@ -528,7 +490,6 @@ static const char LFSTR_ON[] PROGMEM = "\xB2\xB3";
 static const char LFSTR_OFF[] PROGMEM = "\xB4\xB5";
 
 void oled_render_ball_misc_info(void) {
-#ifdef OLED_ENABLE
     // Format: `Ball:{mouse x}{mouse y}{mouse h}{mouse v}`
     //
     // Output example:
@@ -576,11 +537,14 @@ void oled_render_ball_misc_info(void) {
 
     // layer report
     oled_write_P(PSTR(" \xC6\xC7"), false);
+#if defined(RAW_ENABLE) && defined(HID_REPORT_ENABLE)
     if (user_state.raw_hid_layer_report_enabled) {
         oled_write_P(LFSTR_ON, false);
     } else {
         oled_write_P(LFSTR_OFF, false);
     }
+#else
+    oled_write_P(LFSTR_OFF, false);
 #endif
 }
 
@@ -600,6 +564,7 @@ void oled_render_layer_misc_info(void) {
     oled_write(format_u3d(user_state.mouse_activation_threshold), false);
     oled_write_char(' ', false);
 
+#ifdef AUTO_SHIFT_ENABLE
     oled_write_P(PSTR("\xC4\xC5"), false);
     if (get_autoshift_state()) {
         oled_write_P(LFSTR_ON, false);
@@ -607,6 +572,11 @@ void oled_render_layer_misc_info(void) {
         oled_write_P(LFSTR_OFF, false);
     }
     oled_write(format_u3d(get_generic_autoshift_timeout()), false);
+#else
+    oled_write_P(PSTR("\xC4\xC5"), false);
+    oled_write_P(LFSTR_OFF, false);
+    oled_write("---", false);
+#endif
 }
 
 void oled_on_user(bool on) {
@@ -641,7 +611,7 @@ void oledkit_render_info_user(void) {
         return;
     }
     keyball_oled_render_keyinfo();
-#ifndef RAW_ENABLE
+#if !defined(RAW_ENABLE) || !defined(HID_REPORT_ENABLE)
     keyball_oled_render_ballinfo();
 #else
     oled_render_ball_misc_info();
@@ -673,7 +643,6 @@ void oledkit_render_logo_user(void) {
 
 #endif
 
-
 void keyboard_post_init_user(void) {
 #ifdef OLED_ENABLE
     transaction_register_rpc(KEYBALL_SET_OLED_INVERSION, rpc_set_oled_invert_handler);
@@ -681,6 +650,27 @@ void keyboard_post_init_user(void) {
     // turn on OLED on startup.
     oled_on_user(true);
 #endif
+
+#ifdef OS_DETECTION_ENABLE
+    if (detected_host_os() == OS_WINDOWS) {
+        btn2_tb_gesture.motion_codes.forward = KC_NO;
+        btn2_tb_gesture.motion_codes.backward = KC_NO;
+        btn2_tb_gesture.motion_codes.left = C(G(KC_LEFT));
+        btn2_tb_gesture.motion_codes.right = C(G(KC_RIGHT));
+    } else {
+#endif
+        btn2_tb_gesture.motion_codes.forward = KC_NO;
+        btn2_tb_gesture.motion_codes.backward = KC_NO;
+        btn2_tb_gesture.motion_codes.left = LGUI(KC_PGDN);
+        btn2_tb_gesture.motion_codes.right = LGUI(KC_PGUP);
+#ifdef OS_DETECTION_ENABLE
+    }
+#endif
+
+    btn3_tb_gesture.motion_codes.forward = C(KC_EQUAL);
+    btn3_tb_gesture.motion_codes.backward = C(S(KC_MINS));
+    btn3_tb_gesture.motion_codes.left = C(KC_0);
+    btn3_tb_gesture.motion_codes.right = C(KC_0);
 }
 
 void keyball_keyboard_post_init_eeconfig_user(uint32_t raw) {
@@ -699,11 +689,12 @@ void keyball_keyboard_post_init_eeconfig_user(uint32_t raw) {
     user_state.oled_inversion = c.oled_inversion ? true : false;
     oled_invert(user_state.oled_inversion);
 #endif
-#ifdef RAW_ENABLE
+#if defined(RAW_ENABLE) && defined(HID_REPORT_ENABLE)
     user_state.raw_hid_layer_report_enabled = c.report_layer_state ? true : false;
     if (user_state.raw_hid_layer_report_enabled) {
     }
 #endif
+#ifdef AUTO_SHIFT_ENABLE
     if (c.autoshift_enabled) {
         autoshift_enable();
     } else {
@@ -714,11 +705,12 @@ void keyball_keyboard_post_init_eeconfig_user(uint32_t raw) {
             ? AUTO_SHIFT_TIMEOUT
             : AUTO_SHIFT_TIMEOUT_MIN + AUTO_SHIFT_TIMEOUT_QU * (c.autoshift_timeout - 1)
     );
+#endif
 }
 
 void housekeeping_task_user() {
-    btn_update_hold_state(&btn2_state);
-    btn_update_hold_state(&btn3_state);
+    tb_gesture_update_hold_state(&btn2_tb_gesture);
+    tb_gesture_update_hold_state(&btn3_tb_gesture);
     if (is_keyboard_master()) {
 #ifdef OLED_ENABLE
         rpc_set_oled_invert_invoke();
@@ -741,28 +733,29 @@ uint32_t keyball_process_record_eeconfig_user(uint32_t raw) {
 #ifdef OLED_ENABLE
     c.oled_inversion = user_state.oled_inversion ? 1 : 0;
 #endif
-#ifdef RAW_ENABLE
+#if defined(RAW_ENABLE) && defined(HID_REPORT_ENABLE)
     c.report_layer_state = user_state.raw_hid_layer_report_enabled ? 1 : 0;
 #endif
-
+#ifdef AUTO_SHIFT_ENABLE
     uint16_t autoshift_timeout = get_generic_autoshift_timeout() <= AUTO_SHIFT_TIMEOUT_MIN
         ? AUTO_SHIFT_TIMEOUT_MIN
         : MIN(get_generic_autoshift_timeout(), AUTO_SHIFT_TIMEOUT_MAX);
     set_autoshift_timeout(autoshift_timeout);
     c.autoshift_enabled  = get_autoshift_state() ? 1 : 0;
     c.autoshift_timeout  = (autoshift_timeout - AUTO_SHIFT_TIMEOUT_MIN) / AUTO_SHIFT_TIMEOUT_QU + 1;
+#endif
 
     return c.raw;
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (keycode == KC_BTN2) {
-        btn_handle_key(&btn2_state, keycode, record);
+        tb_gesture_handle_key(&btn2_tb_gesture, keycode, record);
         handle_mouse_layer(keycode, record);
         return false;
     }
     if (keycode == KC_BTN3) {
-        btn_handle_key(&btn3_state, keycode, record);
+        tb_gesture_handle_key(&btn3_tb_gesture, keycode, record);
         handle_mouse_layer(keycode, record);
         return false;
     }
@@ -804,7 +797,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 }
 #endif
                 break;
-#ifdef RAW_ENABLE
+#if defined(RAW_ENABLE) && defined(HID_REPORT_ENABLE)
             case RT_LY_TGL:
                 user_state.raw_hid_layer_report_enabled = !user_state.raw_hid_layer_report_enabled;
                 return false;
@@ -854,8 +847,8 @@ static void td_quot_handler(tap_dance_state_t *state, void *user_data) {
 }
 
 tap_dance_action_t tap_dance_actions[] = {
-    [TD_QUOTS] = ACTION_TAP_DANCE_FN(td_quot_handler),
-    [TD_PIPE_TILD] = ACTION_TAP_DANCE_DOUBLE(S(KC_INTERNATIONAL_3), S(KC_EQUAL)),
+    [TDKC_QUOTS] = ACTION_TAP_DANCE_FN(td_quot_handler),
+    [TDKC_PIPE_TILD] = ACTION_TAP_DANCE_DOUBLE(S(KC_INTERNATIONAL_3), S(KC_EQUAL)),
 };
 
 #endif
