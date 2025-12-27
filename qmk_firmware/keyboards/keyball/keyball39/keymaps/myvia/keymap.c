@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "transactions.h"
 #include "raw_hid.h"
 #include "tmk_core/protocol/usb_descriptor.h"
+#include "os_detection.h"
 
 #define RAW_REPORT_VERSION 1
 #define RAW_APP_ID_ZQ         0xFF
@@ -32,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MOUSE_LAYER 4
 #define MOUSE_ACTIVATION_THRESHOLD 10
 #define MOUSE_BTN1_RETURN_TERM TAPPING_TERM
+#define BTN_THRESHOLD 50
 
 const uint16_t MOUSE_ACTIVATION_THRESHOLD_MIN = 5;
 const uint16_t MOUSE_ACTIVATION_THRESHOLD_MAX = 155;
@@ -95,6 +97,56 @@ typedef struct {
 } user_state_t;
 
 static user_state_t user_state = {0};
+
+typedef struct {
+    bool pressed;
+    bool held;
+    uint16_t press_timer;
+    int16_t x_accum;
+    int16_t y_accum;
+} btn_state_t;
+
+static btn_state_t btn2_state = {0};
+static btn_state_t btn3_state = {0};
+
+typedef struct {
+    uint16_t forward;
+    uint16_t backward;
+    uint16_t left;
+    uint16_t right;
+} btn_motion_codes_t;
+
+static const btn_motion_codes_t btn3_motion_codes = {
+    .forward = C(KC_EQUAL),
+    .backward = C(S(KC_MINS)),
+    .left = C(KC_0),
+    .right = C(KC_0),
+};
+
+static const btn_motion_codes_t btn2_motion_codes_nonwin = {
+    .forward = KC_NO,
+    .backward = KC_NO,
+    .left = LGUI(KC_PGDN),
+    .right = LGUI(KC_PGUP),
+};
+
+#ifdef OS_DETECTION_ENABLE
+static const btn_motion_codes_t btn2_motion_codes_win = {
+    .forward = KC_NO,
+    .backward = KC_NO,
+    .left = C(G(KC_LEFT)),
+    .right = C(G(KC_RIGHT)),
+};
+#endif
+
+static const btn_motion_codes_t *btn2_motion_codes_for_host(void) {
+#ifdef OS_DETECTION_ENABLE
+    if (detected_host_os() == OS_WINDOWS) {
+        return &btn2_motion_codes_win;
+    }
+#endif
+    return &btn2_motion_codes_nonwin;
+}
 
 // clang-format off
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
@@ -265,12 +317,90 @@ static void mouse_layer_maybe_return(void) {
     }
 }
 
+static void btn_update_hold_state(btn_state_t *state) {
+    if (state->pressed && !state->held &&
+        timer_elapsed(state->press_timer) >= TAPPING_TERM) {
+        state->held = true;
+        state->x_accum = 0;
+        state->y_accum = 0;
+    }
+}
+
+static void btn_handle_key(btn_state_t *state, uint16_t keycode, keyrecord_t *record) {
+    if (record->event.pressed) {
+        state->pressed = true;
+        state->held = false;
+        state->press_timer = timer_read();
+        state->x_accum = 0;
+        state->y_accum = 0;
+    } else {
+        btn_update_hold_state(state);
+        state->pressed = false;
+        if (!state->held) {
+            tap_code16(keycode);
+        }
+        state->held = false;
+        state->x_accum = 0;
+        state->y_accum = 0;
+    }
+}
+
+static void btn_handle_motion(btn_state_t *state, const btn_motion_codes_t *codes, report_mouse_t *mouse_report) {
+    if (!state->held) {
+        return;
+    }
+
+    if (mouse_report->x != 0) {
+        state->x_accum += mouse_report->x;
+        while (state->x_accum >= BTN_THRESHOLD || state->x_accum <= -BTN_THRESHOLD) {
+            if (state->x_accum > 0) {
+                if (codes->right != KC_NO) {
+                    tap_code16(codes->right);
+                }
+                state->x_accum -= BTN_THRESHOLD;
+            } else {
+                if (codes->left != KC_NO) {
+                    tap_code16(codes->left);
+                }
+                state->x_accum += BTN_THRESHOLD;
+            }
+        }
+    }
+
+    if (mouse_report->y != 0) {
+        state->y_accum += mouse_report->y;
+        while (state->y_accum >= BTN_THRESHOLD || state->y_accum <= -BTN_THRESHOLD) {
+            if (state->y_accum > 0) {
+                if (codes->backward != KC_NO) {
+                    tap_code16(codes->backward);
+                }
+                state->y_accum -= BTN_THRESHOLD;
+            } else {
+                if (codes->forward != KC_NO) {
+                    tap_code16(codes->forward);
+                }
+                state->y_accum += BTN_THRESHOLD;
+            }
+        }
+    }
+
+    mouse_report->x = 0;
+    mouse_report->y = 0;
+    mouse_report->h = 0;
+    mouse_report->v = 0;
+}
+
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     mouse_layer_maybe_return();
 
     if (mouse_layer_state.active && !layer_state_is(MOUSE_LAYER)) {
         mouse_layer_state.active = false;
     }
+
+    btn_update_hold_state(&btn2_state);
+    btn_handle_motion(&btn2_state, btn2_motion_codes_for_host(), &mouse_report);
+    btn_update_hold_state(&btn3_state);
+    btn_handle_motion(&btn3_state, &btn3_motion_codes, &mouse_report);
 
     if (user_state.auto_mouse_layer_enabled && !mouse_layer_state.active && mouse_motion_exceeds_threshold(&mouse_report)) {
         layer_on(MOUSE_LAYER);
@@ -587,6 +717,8 @@ void keyball_keyboard_post_init_eeconfig_user(uint32_t raw) {
 }
 
 void housekeeping_task_user() {
+    btn_update_hold_state(&btn2_state);
+    btn_update_hold_state(&btn3_state);
     if (is_keyboard_master()) {
 #ifdef OLED_ENABLE
         rpc_set_oled_invert_invoke();
@@ -624,6 +756,17 @@ uint32_t keyball_process_record_eeconfig_user(uint32_t raw) {
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (keycode == KC_BTN2) {
+        btn_handle_key(&btn2_state, keycode, record);
+        handle_mouse_layer(keycode, record);
+        return false;
+    }
+    if (keycode == KC_BTN3) {
+        btn_handle_key(&btn3_state, keycode, record);
+        handle_mouse_layer(keycode, record);
+        return false;
+    }
+
     if (record->event.pressed) {
         // TODO Update oled timer if oled is on.
         switch (keycode) {
