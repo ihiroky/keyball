@@ -25,6 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define AUTO_SHIFT_REPEAT
 #define NO_ACTION_ONESHOT
 
+#define HID_REPORT_ENABLE
+
 // Prevent `quantum\keyboard.c` from calling oled_on().
 #define OLED_TIMEOUT 0
 #define KEYBALL_OLED_TIMEOUT 30000
