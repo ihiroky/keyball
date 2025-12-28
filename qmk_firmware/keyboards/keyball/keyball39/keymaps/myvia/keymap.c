@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "raw_hid.h"
 #include "tmk_core/protocol/usb_descriptor.h"
 #include "os_detection.h"
+#include "keymap_extras/keymap_japanese.h"
 
 #define RAW_REPORT_VERSION 1
 #define RAW_APP_ID_ZQ         0xFF
@@ -52,8 +53,9 @@ enum user_keycodes {
 };
 
 enum user_tapdance_keycodes {
-    TDKC_QUOTS,
-    TDKC_PIPE_TILD,
+    TD_QUOTS,
+    TD_TILD_PIPE,
+    TD_PIPE_MO3,
 };
 
 typedef union {
@@ -105,39 +107,45 @@ static tb_gesture_t btn2_tb_gesture = {0};
 static tb_gesture_t btn3_tb_gesture = {0};
 
 // clang-format off
-#define LA_TAB LALT_T(KC_TAB)
-#define LS_SPC LSFT_T(KC_SPC)
-#define TD_QUOTS  TD(TDKC_QUOTS)
-#define TD_PP_TLD TD(TDKC_PIPE_TILD)
+#define KC_TDQUOTS TD(TD_QUOTS)
+#define KC_TDPPTLD TD(TD_TILD_PIPE)
+#define KC_TDPPMO3 TD(TD_PIPE_MO3)
+#define LS_SPC    LSFT_T(KC_SPC)
+#define L3_YEN    LT(3, JP_YEN)
+#define L2_BSPC   LT(2, KC_BSPC)
+#define L1_DEL    LT(1, KC_DEL)
+#define LC_TAB    LCTL_T(KC_TAB)
+#define RS_BSLS   RSFT_T(JP_BSLS)
+#define LS_LGUI   LSFT_T(KC_LGUI)
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // keymap for default (VIA)
   [0] = LAYOUT_universal(
-    KC_Q     , KC_W     , KC_E     , KC_R     , KC_T     ,                       KC_Y     , KC_U     , KC_I     , KC_O     , KC_P     ,
-    KC_A     , KC_S     , KC_D     , KC_F     , KC_G     ,                       KC_H     , KC_J     , KC_K     , KC_L     , KC_ENTER ,
-    KC_Z     , KC_X     , KC_C     , KC_V     , KC_B     ,                       KC_N     , KC_M     , KC_COMM  , KC_DOT   , KC_SLSH  ,
-    KC_ESC   , LA_TAB   , KC_LGUI  , MO(3)    , LS_SPC   , MO(2)    , MO(1)    , KC_LCTL  , _______  , _______  , _______  , KC_RSFT
+    JP_Q     , JP_W     , JP_E     , JP_R     , JP_T     ,                       JP_Y     , JP_U     , JP_I     , JP_O     , JP_P     ,
+    JP_A     , JP_S     , JP_D     , JP_F     , JP_G     ,                       JP_H     , JP_J     , JP_K     , JP_L     , KC_ENTER ,
+    JP_Z     , JP_X     , JP_C     , JP_V     , JP_B     ,                       JP_N     , JP_M     , JP_COMM  , JP_DOT   , JP_SLSH  ,
+    KC_ESC   , KC_LALT  , KC_LGUI  ,KC_TDPPMO3, LS_SPC   , L2_BSPC  , L1_DEL  ,  LC_TAB   , _______  , _______  , _______  , RS_BSLS
   ),
 
   [1] = LAYOUT_universal(
-    KC_1     , KC_2     , KC_3     , KC_4     , KC_5     ,                       KC_F1    , KC_F2    , KC_F3    , KC_F4    , KC_F5    ,
-    KC_6     , KC_7     , KC_8     , KC_9     , KC_0     ,                       KC_F6    , KC_F7    , KC_F8    , KC_F9    , KC_F10   ,
-    KC_MINUS ,S(KC_MINS), KC_INT3  , KC_RBRC  , KC_BSLS  ,                       TD_QUOTS , KC_F11   , KC_F12   , KC_F13   , TD_PP_TLD,
-    KC_SCLN  , S(KC_7)  ,S(KC_LBRC), KC_BSPC  , KC_TAB   , KC_DEL   , _______  , _______  , _______  , _______  , _______  , _______
+    JP_1     , JP_2     , JP_3     , JP_4     , JP_5     ,                       KC_F1    , KC_F2    , KC_F3    , KC_F4    , KC_F5    ,
+    JP_6     , JP_7     , JP_8     , JP_9     , JP_0     ,                       KC_F6    , KC_F7    , KC_F8    , KC_F9    , KC_F10   ,
+    JP_MINS  , JP_EQL   , JP_YEN   , JP_LBRC  , JP_RBRC  ,                      KC_TDQUOTS, KC_F11   , KC_F12   , KC_F13   ,KC_TDPPTLD,
+    JP_SCLN  , JP_QUOT  , JP_GRV   , _______  , LS_LGUI  , _______  , _______  , _______  , _______  , _______  , _______  , _______
   ),
 
   [2] = LAYOUT_universal(
-    S(KC_1)  , KC_LBRC  , S(KC_3)  , S(KC_4)  , S(KC_5)  ,                       KC_PSCR  , KC_BRID  , KC_BRIU  , KC_MUTE  , KC_VOLU  ,
-    KC_EQUAL , S(KC_6)  ,S(KC_QUOT), S(KC_8)  , S(KC_9)  ,                       KC_LEFT  , KC_DOWN  , KC_UP    , KC_RIGHT , KC_VOLD  ,
-   S(KC_INT1),S(KC_SCLN),S(KC_INT3),S(KC_RBRC),S(KC_BSLS),                       KC_HOME  , KC_PGDN  , KC_PGUP  , KC_END   , KC_F20   ,
-    KC_QUOT , S(KC_2)   ,S(KC_EQL) , _______  , _______  , _______  , KC_RALT  , _______  , _______  , _______  , _______  , _______
+    JP_EXLM  , JP_AT    , JP_HASH  , JP_DLR   , JP_PERC  ,                       KC_PSCR  , KC_BRID  , KC_BRIU  , KC_MUTE  , KC_VOLU  ,
+    JP_CIRC  , JP_AMPR  , JP_ASTR  , JP_LPRN  , JP_RPRN  ,                       KC_LEFT  , KC_DOWN  , KC_UP    , KC_RIGHT , KC_VOLD  ,
+    JP_UNDS  , JP_PLUS  , JP_PIPE  , JP_LCBR  , JP_RCBR  ,                       KC_HOME  , KC_PGDN  , KC_PGUP  , KC_END   , KC_F20   ,
+    JP_COLN  , JP_DQUO  , JP_TILD  , _______  , _______  , _______  , KC_RALT  , _______  , _______  , _______  , _______  , _______
   ),
 
   [3] = LAYOUT_universal(
-    AML_TO   , SCRL_TO  , CPI_I100 , SSNP_VRT , QK_BOOT  ,                       QK_BOOT  , AMLY_TGL , AS_TOGG  , _______  , QK_RBT   ,
+    AML_TO   , SCRL_TO  , CPI_I100 , SSNP_VRT , _______  ,                       QK_MAKE  , AMLY_TGL , AS_TOGG  , _______  , QK_RBT   ,
     AML_I50  , SCRL_MO  , CPI_D100 , SSNP_HOR , KBC_RST  ,                       OL_TGL   , MAT_I5   , AS_UP    , _______  , _______  ,
-    AML_D50  , SCRL_DVI , CPI_I1K  , SSNP_FRE , KBC_SAVE ,                       OL_TGLINV, MAT_D5   , AS_DOWN  , RT_LY_TGL, KC_GRAVE ,
-    _______  , SCRL_DVD , CPI_D1K  , _______  , _______  , _______  , KC_INT4  , KC_INT5  , _______  , _______  , _______  , _______
+    AML_D50  , SCRL_DVI , CPI_I1K  , SSNP_FRE , KBC_SAVE ,                       OL_TGLINV, MAT_D5   , AS_DOWN  , RT_LY_TGL, JP_ZKHK  ,
+    _______  , SCRL_DVD , CPI_D1K  , _______  , QK_BOOT  , EE_CLR   , JP_HENK  , JP_MHEN  , _______  , _______  , _______  , _______
   ),
 
   [4] = LAYOUT_universal(
@@ -199,6 +207,91 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
 }
 #endif
 
+#ifdef TAP_DANCE_ENABLE
+
+typedef struct {
+    uint16_t tap;
+    uint16_t hold;
+    uint16_t held;
+} tap_dance_tap_hold_t;
+
+static void td_quots_handler(tap_dance_state_t *state, void *user_data) {
+    // 1 tap: ' , 2 taps: " , 3+ taps: `
+    const uint16_t c =
+        (state->count == 1) ? JP_QUOT :
+        (state->count == 2) ? JP_DQUO :
+        JP_GRV;
+    tap_code16(c);
+}
+
+void tap_dance_tap_hold_finished(tap_dance_state_t *state, void *user_data) {
+    tap_dance_tap_hold_t *tap_hold = (tap_dance_tap_hold_t *)user_data;
+
+    // Block to call twice (track ball interruption and regular event)
+    if (state->count == 0 || tap_hold->held) {
+        return;
+    }
+
+    if (state->count > 1) {
+        // Multi-tap: repeat tap; if still pressed, keep last tap held for key repeat.
+        if (state->pressed) {
+            for (uint8_t i = 0; i < (state->count - 1); i++) {
+                tap_code16(tap_hold->tap);
+            }
+            register_code16(tap_hold->tap);
+            tap_hold->held = tap_hold->tap;
+        } else {
+            for (uint8_t i = 0; i < state->count; i++) {
+                tap_code16(tap_hold->tap);
+            }
+        }
+        return;
+    }
+
+    if (state->pressed
+#if !defined(PERMISSIVE_HOLD) && !defined(HOLD_ON_OTHER_KEY_PRESS)
+        && !state->interrupted
+#endif
+    ) {
+        if (QK_MOMENTARY <= tap_hold->hold && tap_hold->hold <= QK_MOMENTARY_MAX) {
+            layer_on(QK_MOMENTARY_GET_LAYER(tap_hold->hold));
+        } else {
+            register_code16(tap_hold->hold);
+        }
+        tap_hold->held = tap_hold->hold;
+    } else {
+        register_code16(tap_hold->tap);
+        tap_hold->held = tap_hold->tap;
+    }
+}
+
+void tap_dance_tap_hold_reset(tap_dance_state_t *state, void *user_data) {
+    tap_dance_tap_hold_t *tap_hold = (tap_dance_tap_hold_t *)user_data;
+
+    if (tap_hold->held) {
+        if (QK_MOMENTARY <= tap_hold->held && tap_hold->held <= QK_MOMENTARY_MAX) {
+            layer_off(QK_MOMENTARY_GET_LAYER(tap_hold->held));
+        } else {
+            unregister_code16(tap_hold->held);
+        }
+        tap_hold->held = 0;
+    }
+}
+
+#define ACTION_TAP_DANCE_TAP_HOLD(tap, hold)                                        \
+    {                                                                               \
+        .fn        = {NULL, tap_dance_tap_hold_finished, tap_dance_tap_hold_reset}, \
+        .user_data = (void *)&((tap_dance_tap_hold_t){tap, hold, 0}),               \
+    }
+
+tap_dance_action_t tap_dance_actions[] = {
+    [TD_QUOTS] = ACTION_TAP_DANCE_FN(td_quots_handler),
+    [TD_TILD_PIPE] = ACTION_TAP_DANCE_DOUBLE(JP_TILD, JP_PIPE),
+    [TD_PIPE_MO3] =  ACTION_TAP_DANCE_TAP_HOLD(JP_PIPE, MO(3)),
+};
+
+#endif
+
 #ifndef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 typedef struct {
     bool          active;
@@ -214,8 +307,12 @@ static inline uint8_t abs8(int8_t v) {
     return v < 0 ? (uint8_t)(-v) : (uint8_t)v;
 }
 
+static inline uint16_t trackball_motion(const report_mouse_t *report) {
+    return (uint16_t)abs8(report->x) + (uint16_t)abs8(report->y) + (uint16_t)abs8(report->h) + (uint16_t)abs8(report->v);
+}
+
 static bool mouse_motion_exceeds_threshold(const report_mouse_t *report) {
-    uint16_t delta = (uint16_t)abs8(report->x) + (uint16_t)abs8(report->y) + (uint16_t)abs8(report->h) + (uint16_t)abs8(report->v);
+    uint16_t delta = trackball_motion(report);
     if (delta == 0) {
         return false;
     }
@@ -363,6 +460,18 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     tb_gesture_handle_motion(&btn2_tb_gesture, &mouse_report);
     tb_gesture_update_hold_state(&btn3_tb_gesture);
     tb_gesture_handle_motion(&btn3_tb_gesture, &mouse_report);
+
+#ifdef TAP_DANCE_ENABLE
+    // Interrupt to tap dance for tap/hold
+    tap_dance_action_t *tda = &tap_dance_actions[TD_PIPE_MO3];
+    tap_dance_state_t *tds = &tda->state;
+    if (tds->count == 1 && tds->pressed) {
+        uint16_t td_delta = trackball_motion(&mouse_report);
+        if (td_delta > 0) {
+            tap_dance_tap_hold_finished(tds, tda->user_data);
+        }
+    }
+#endif
 
     if (user_state.auto_mouse_layer_enabled && !mouse_layer_state.active && mouse_motion_exceeds_threshold(&mouse_report)) {
         layer_on(MOUSE_LAYER);
@@ -667,8 +776,8 @@ void keyboard_post_init_user(void) {
     }
 #endif
 
-    btn3_tb_gesture.motion_codes.forward = C(KC_EQUAL);
-    btn3_tb_gesture.motion_codes.backward = C(S(KC_MINS));
+    btn3_tb_gesture.motion_codes.forward = C(JP_CIRC);
+    btn3_tb_gesture.motion_codes.backward = C(JP_MINS);
     btn3_tb_gesture.motion_codes.left = C(KC_0);
     btn3_tb_gesture.motion_codes.right = C(KC_0);
 }
@@ -822,33 +931,12 @@ const uint16_t PROGMEM jl_mclick_combo[] = {KC_J, KC_L, COMBO_END};
 const uint16_t PROGMEM mcomm_back_combo[] = {KC_M, KC_COMM, COMBO_END};
 const uint16_t PROGMEM commdot_fwd_combo[] = {KC_COMM, KC_DOT, COMBO_END};
 
-
 combo_t key_combos[] = {
     COMBO(jk_lclick_combo, KC_BTN1),
     COMBO(kl_rclick_combo, KC_BTN2),
     COMBO(jl_mclick_combo, KC_BTN3),
     COMBO(mcomm_back_combo, A(KC_LEFT)),
     COMBO(commdot_fwd_combo, A(KC_RIGHT)),
-};
-
-#endif
-
-#ifdef TAP_DANCE_ENABLE
-
-// Japanese keyboard specific characters
-
-static void td_quot_handler(tap_dance_state_t *state, void *user_data) {
-    // 1 tap: ' , 2 taps: " , 3+ taps: `
-    const uint16_t c =
-        (state->count == 1) ? S(KC_7) :
-        (state->count == 2) ? S(KC_2) :
-        S(KC_LEFT_BRACKET);
-    tap_code16(c);
-}
-
-tap_dance_action_t tap_dance_actions[] = {
-    [TDKC_QUOTS] = ACTION_TAP_DANCE_FN(td_quot_handler),
-    [TDKC_PIPE_TILD] = ACTION_TAP_DANCE_DOUBLE(S(KC_INTERNATIONAL_3), S(KC_EQUAL)),
 };
 
 #endif
