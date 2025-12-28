@@ -55,6 +55,7 @@ enum user_keycodes {
 enum user_tapdance_keycodes {
     TD_QUOTS,
     TD_TILD_PIPE,
+    TD_PIPE_MO3,
 };
 
 typedef union {
@@ -108,6 +109,7 @@ static tb_gesture_t btn3_tb_gesture = {0};
 // clang-format off
 #define KC_TDQUOTS TD(TD_QUOTS)
 #define KC_TDPPTLD TD(TD_TILD_PIPE)
+#define KC_TDPPMO3 TD(TD_PIPE_MO3)
 #define LS_SPC    LSFT_T(KC_SPC)
 #define L3_YEN    LT(3, JP_YEN)
 #define L2_BSPC   LT(2, KC_BSPC)
@@ -122,7 +124,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     JP_Q     , JP_W     , JP_E     , JP_R     , JP_T     ,                       JP_Y     , JP_U     , JP_I     , JP_O     , JP_P     ,
     JP_A     , JP_S     , JP_D     , JP_F     , JP_G     ,                       JP_H     , JP_J     , JP_K     , JP_L     , KC_ENTER ,
     JP_Z     , JP_X     , JP_C     , JP_V     , JP_B     ,                       JP_N     , JP_M     , JP_COMM  , JP_DOT   , JP_SLSH  ,
-    KC_ESC   , KC_LALT  , KC_LGUI  , L3_YEN   , LS_SPC   , L2_BSPC  , L1_DEL  ,  LC_TAB   , _______  , _______  , _______  , RS_BSLS
+    KC_ESC   , KC_LALT  , KC_LGUI  ,KC_TDPPMO3, LS_SPC   , L2_BSPC  , L1_DEL  ,  LC_TAB   , _______  , _______  , _______  , RS_BSLS
   ),
 
   [1] = LAYOUT_universal(
@@ -205,6 +207,91 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
 }
 #endif
 
+#ifdef TAP_DANCE_ENABLE
+
+typedef struct {
+    uint16_t tap;
+    uint16_t hold;
+    uint16_t held;
+} tap_dance_tap_hold_t;
+
+static void td_quots_handler(tap_dance_state_t *state, void *user_data) {
+    // 1 tap: ' , 2 taps: " , 3+ taps: `
+    const uint16_t c =
+        (state->count == 1) ? JP_QUOT :
+        (state->count == 2) ? JP_DQUO :
+        JP_GRV;
+    tap_code16(c);
+}
+
+void tap_dance_tap_hold_finished(tap_dance_state_t *state, void *user_data) {
+    tap_dance_tap_hold_t *tap_hold = (tap_dance_tap_hold_t *)user_data;
+
+    // Block to call twice (track ball interruption and regular event)
+    if (state->count == 0 || tap_hold->held) {
+        return;
+    }
+
+    if (state->count > 1) {
+        // Multi-tap: repeat tap; if still pressed, keep last tap held for key repeat.
+        if (state->pressed) {
+            for (uint8_t i = 0; i < (state->count - 1); i++) {
+                tap_code16(tap_hold->tap);
+            }
+            register_code16(tap_hold->tap);
+            tap_hold->held = tap_hold->tap;
+        } else {
+            for (uint8_t i = 0; i < state->count; i++) {
+                tap_code16(tap_hold->tap);
+            }
+        }
+        return;
+    }
+
+    if (state->pressed
+#if !defined(PERMISSIVE_HOLD) && !defined(HOLD_ON_OTHER_KEY_PRESS)
+        && !state->interrupted
+#endif
+    ) {
+        if (QK_MOMENTARY <= tap_hold->hold && tap_hold->hold <= QK_MOMENTARY_MAX) {
+            layer_on(QK_MOMENTARY_GET_LAYER(tap_hold->hold));
+        } else {
+            register_code16(tap_hold->hold);
+        }
+        tap_hold->held = tap_hold->hold;
+    } else {
+        register_code16(tap_hold->tap);
+        tap_hold->held = tap_hold->tap;
+    }
+}
+
+void tap_dance_tap_hold_reset(tap_dance_state_t *state, void *user_data) {
+    tap_dance_tap_hold_t *tap_hold = (tap_dance_tap_hold_t *)user_data;
+
+    if (tap_hold->held) {
+        if (QK_MOMENTARY <= tap_hold->held && tap_hold->held <= QK_MOMENTARY_MAX) {
+            layer_off(QK_MOMENTARY_GET_LAYER(tap_hold->held));
+        } else {
+            unregister_code16(tap_hold->held);
+        }
+        tap_hold->held = 0;
+    }
+}
+
+#define ACTION_TAP_DANCE_TAP_HOLD(tap, hold)                                        \
+    {                                                                               \
+        .fn        = {NULL, tap_dance_tap_hold_finished, tap_dance_tap_hold_reset}, \
+        .user_data = (void *)&((tap_dance_tap_hold_t){tap, hold, 0}),               \
+    }
+
+tap_dance_action_t tap_dance_actions[] = {
+    [TD_QUOTS] = ACTION_TAP_DANCE_FN(td_quots_handler),
+    [TD_TILD_PIPE] = ACTION_TAP_DANCE_DOUBLE(JP_TILD, JP_PIPE),
+    [TD_PIPE_MO3] =  ACTION_TAP_DANCE_TAP_HOLD(JP_PIPE, MO(3)),
+};
+
+#endif
+
 #ifndef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 typedef struct {
     bool          active;
@@ -220,8 +307,12 @@ static inline uint8_t abs8(int8_t v) {
     return v < 0 ? (uint8_t)(-v) : (uint8_t)v;
 }
 
+static inline uint16_t trackball_motion(const report_mouse_t *report) {
+    return (uint16_t)abs8(report->x) + (uint16_t)abs8(report->y) + (uint16_t)abs8(report->h) + (uint16_t)abs8(report->v);
+}
+
 static bool mouse_motion_exceeds_threshold(const report_mouse_t *report) {
-    uint16_t delta = (uint16_t)abs8(report->x) + (uint16_t)abs8(report->y) + (uint16_t)abs8(report->h) + (uint16_t)abs8(report->v);
+    uint16_t delta = trackball_motion(report);
     if (delta == 0) {
         return false;
     }
@@ -369,6 +460,18 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     tb_gesture_handle_motion(&btn2_tb_gesture, &mouse_report);
     tb_gesture_update_hold_state(&btn3_tb_gesture);
     tb_gesture_handle_motion(&btn3_tb_gesture, &mouse_report);
+
+#ifdef TAP_DANCE_ENABLE
+    // Interrupt to tap dance for tap/hold
+    tap_dance_action_t *tda = &tap_dance_actions[TD_PIPE_MO3];
+    tap_dance_state_t *tds = &tda->state;
+    if (tds->count == 1 && tds->pressed) {
+        uint16_t td_delta = trackball_motion(&mouse_report);
+        if (td_delta > 0) {
+            tap_dance_tap_hold_finished(tds, tda->user_data);
+        }
+    }
+#endif
 
     if (user_state.auto_mouse_layer_enabled && !mouse_layer_state.active && mouse_motion_exceeds_threshold(&mouse_report)) {
         layer_on(MOUSE_LAYER);
@@ -673,8 +776,8 @@ void keyboard_post_init_user(void) {
     }
 #endif
 
-    btn3_tb_gesture.motion_codes.forward = C(KC_EQUAL);
-    btn3_tb_gesture.motion_codes.backward = C(S(KC_MINS));
+    btn3_tb_gesture.motion_codes.forward = C(JP_CIRC);
+    btn3_tb_gesture.motion_codes.backward = C(JP_MINS);
     btn3_tb_gesture.motion_codes.left = C(KC_0);
     btn3_tb_gesture.motion_codes.right = C(KC_0);
 }
@@ -828,33 +931,12 @@ const uint16_t PROGMEM jl_mclick_combo[] = {KC_J, KC_L, COMBO_END};
 const uint16_t PROGMEM mcomm_back_combo[] = {KC_M, KC_COMM, COMBO_END};
 const uint16_t PROGMEM commdot_fwd_combo[] = {KC_COMM, KC_DOT, COMBO_END};
 
-
 combo_t key_combos[] = {
     COMBO(jk_lclick_combo, KC_BTN1),
     COMBO(kl_rclick_combo, KC_BTN2),
     COMBO(jl_mclick_combo, KC_BTN3),
     COMBO(mcomm_back_combo, A(KC_LEFT)),
     COMBO(commdot_fwd_combo, A(KC_RIGHT)),
-};
-
-#endif
-
-#ifdef TAP_DANCE_ENABLE
-
-// Japanese keyboard specific characters
-
-static void td_quots_handler(tap_dance_state_t *state, void *user_data) {
-    // 1 tap: ' , 2 taps: " , 3+ taps: `
-    const uint16_t c =
-        (state->count == 1) ? JP_QUOT :
-        (state->count == 2) ? JP_DQUO :
-        JP_GRV;
-    tap_code16(c);
-}
-
-tap_dance_action_t tap_dance_actions[] = {
-    [TD_QUOTS] = ACTION_TAP_DANCE_FN(td_quots_handler),
-    [TD_TILD_PIPE] = ACTION_TAP_DANCE_DOUBLE(JP_TILD, JP_PIPE),
 };
 
 #endif
