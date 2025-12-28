@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include QMK_KEYBOARD_H
 
 #include "quantum.h"
-#include "transactions.h"
+#include "split_common/transactions.h"
 #include "raw_hid.h"
-#include "tmk_core/protocol/usb_descriptor.h"
+#include "usb_descriptor.h"
 #include "os_detection.h"
 #include "keymap_extras/keymap_japanese.h"
 
