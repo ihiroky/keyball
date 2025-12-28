@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MOUSE_LAYER 4
 #define MOUSE_ACTIVATION_THRESHOLD 10
 #define MOUSE_BTN1_RETURN_TERM TAPPING_TERM
-#define BTN_THRESHOLD 100
+#define TB_GESTURE_THRESHOLD 100
 
 const uint16_t MOUSE_ACTIVATION_THRESHOLD_MIN = 5;
 const uint16_t MOUSE_ACTIVATION_THRESHOLD_MAX = 155;
@@ -410,39 +410,39 @@ static void tb_gesture_handle_motion(tb_gesture_t *state, report_mouse_t *mouse_
 
     if (mouse_report->x != 0) {
         state->x_accum += mouse_report->x;
-        while (state->x_accum >= BTN_THRESHOLD || state->x_accum <= -BTN_THRESHOLD) {
+        while (state->x_accum >= TB_GESTURE_THRESHOLD || state->x_accum <= -TB_GESTURE_THRESHOLD) {
             if (state->x_accum > 0) {
                 if (state->motion_codes.right != KC_NO) {
                     tap_code16(state->motion_codes.right);
                 }
-                state->x_accum -= BTN_THRESHOLD;
+                state->x_accum = 0;
             } else {
                 if (state->motion_codes.left != KC_NO) {
                     tap_code16(state->motion_codes.left);
                 }
-                state->x_accum += BTN_THRESHOLD;
+                state->x_accum = 0;
             }
         }
     }
 
     if (mouse_report->y != 0) {
         state->y_accum += mouse_report->y;
-        while (state->y_accum >= BTN_THRESHOLD || state->y_accum <= -BTN_THRESHOLD) {
+        while (state->y_accum >= TB_GESTURE_THRESHOLD || state->y_accum <= -TB_GESTURE_THRESHOLD) {
             if (state->y_accum > 0) {
                 if (state->motion_codes.backward != KC_NO) {
                     tap_code16(state->motion_codes.backward);
                 }
-                state->y_accum -= BTN_THRESHOLD;
+                state->y_accum = 0;
             } else {
                 if (state->motion_codes.forward != KC_NO) {
                     tap_code16(state->motion_codes.forward);
                 }
-                state->y_accum += BTN_THRESHOLD;
+                state->y_accum = 0;
             }
         }
     }
 
-    // Stop Oocursor.
+    // Stop cursor.
     mouse_report->x = 0;
     mouse_report->y = 0;
     mouse_report->h = 0;
