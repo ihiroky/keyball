@@ -5,7 +5,10 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "${env:HOME}/projects/qmk/quantum",
-                "${env:HOME}/projects/qmk/quantum/split_common"
+                "${env:HOME}/projects/qmk/tmk_core",
+                "${env:HOME}/projects/qmk/drivers",
+                "${env:HOME}/projects/qmk/platforms",
+                "${env:HOME}/projects/qmk/tmk_core/protocol"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
