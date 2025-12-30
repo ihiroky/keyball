@@ -32,13 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define DEFAULT_LAYER 0
 #define MOUSE_LAYER 4
-#define MOUSE_ACTIVATION_THRESHOLD 10
 #define MOUSE_BTN1_RETURN_TERM TAPPING_TERM
-#define TB_GESTURE_THRESHOLD 100
+#define TB_ACTIVATION_THRESHOLD 75
+#define TB_GESTURE_INTERVAL 250
 
-const uint16_t MOUSE_ACTIVATION_THRESHOLD_MIN = 5;
-const uint16_t MOUSE_ACTIVATION_THRESHOLD_MAX = 155;
-const uint16_t MOUSE_ACTIVATION_THRESHOLD_QU = 5;
+const uint16_t TB_ACTIVATION_THRESHOLD_MIN = 5;
+const uint16_t TB_ACTIVATION_THRESHOLD_MAX = 155;
+const uint16_t TB_ACTIVATION_THRESHOLD_QU = 5;
 const uint16_t AUTO_SHIFT_TIMEOUT_MIN = 100;
 const uint16_t AUTO_SHIFT_TIMEOUT_MAX = 250;
 const uint16_t AUTO_SHIFT_TIMEOUT_QU  = 5;   // Quantization Unit
@@ -46,8 +46,8 @@ const uint16_t AUTO_SHIFT_TIMEOUT_QU  = 5;   // Quantization Unit
 enum user_keycodes {
     OL_TGL = KEYBALL_SAFE_RANGE, // Toggle OLED on/off ,User 0
     OL_TGLINV,                   // Invert OLED display
-    MAT_I5, // Increase mouse_activation_threshold by 5
-    MAT_D5, // Decrease mouse_activation_threshold by 5
+    TAT_I5, // Increase trackball_activation_threshold by 5
+    TAT_D5, // Decrease trackball_activation_threshold by 5
     AMLY_TGL, // Toggle auto mouse layer
     RT_LY_TGL, // Layer state report toggle
 };
@@ -65,7 +65,7 @@ typedef union {
         uint8_t  report_layer_state : 1;
         uint8_t  oled_inversion : 1;
         uint8_t  auto_mouse_layer_enabled : 1;
-        uint16_t mouse_activation_threshold : 5;
+        uint16_t trackball_activation_threshold : 5;
         uint8_t  autoshift_enabled : 1;
         uint16_t autoshift_timeout : 5;
     };
@@ -73,7 +73,7 @@ typedef union {
 
 typedef struct {
     bool auto_mouse_layer_enabled;
-    uint16_t mouse_activation_threshold;
+    uint16_t trackball_activation_threshold;
 #ifdef OLED_ENABLE
     bool oled_on;
     uint32_t oled_timer;
@@ -95,6 +95,7 @@ typedef struct {
     uint16_t press_timer;
     int16_t x_accum;
     int16_t y_accum;
+    uint16_t fire_timer;
     struct {
         uint16_t forward;
         uint16_t backward;
@@ -144,8 +145,8 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
   [3] = LAYOUT_universal(
     AML_TO   , SCRL_TO  , CPI_I100 , SSNP_VRT , _______  ,                       QK_MAKE  , AMLY_TGL , AS_TOGG  , _______  , QK_RBT   ,
-    AML_I50  , SCRL_MO  , CPI_D100 , SSNP_HOR , KBC_RST  ,                       OL_TGL   , MAT_I5   , AS_UP    , _______  , _______  ,
-    AML_D50  , SCRL_DVI , CPI_I1K  , SSNP_FRE , KBC_SAVE ,                       OL_TGLINV, MAT_D5   , AS_DOWN  , RT_LY_TGL, JP_ZKHK  ,
+    AML_I50  , SCRL_MO  , CPI_D100 , SSNP_HOR , KBC_RST  ,                       OL_TGL   , TAT_I5   , AS_UP    , _______  , _______  ,
+    AML_D50  , SCRL_DVI , CPI_I1K  , SSNP_FRE , KBC_SAVE ,                       OL_TGLINV, TAT_D5   , AS_DOWN  , RT_LY_TGL, JP_ZKHK  ,
     _______  , SCRL_DVD , CPI_D1K  , _______  , QK_BOOT  , EE_CLR   , JP_HENK  , JP_MHEN  , _______  , _______  , _______  , _______
   ),
 
@@ -318,7 +319,7 @@ static bool mouse_motion_exceeds_threshold(const report_mouse_t *report) {
         return false;
     }
     mouse_layer_state.motion_accum += delta;
-    if (mouse_layer_state.motion_accum >= user_state.mouse_activation_threshold) {
+    if (mouse_layer_state.motion_accum >= user_state.trackball_activation_threshold) {
         mouse_layer_state.motion_accum = 0;
         return true;
     }
@@ -376,12 +377,16 @@ static void mouse_layer_maybe_return(void) {
     }
 }
 
-static void tb_gesture_update_hold_state(tb_gesture_t *state) {
+static void tb_gesture_update_state(tb_gesture_t *state) {
     if (state->pressed && !state->held &&
         timer_elapsed(state->press_timer) >= TAPPING_TERM) {
         state->held = true;
         state->x_accum = 0;
         state->y_accum = 0;
+    }
+    if (state->fire_timer &&
+        timer_elapsed(state->fire_timer) >= TB_GESTURE_INTERVAL) {
+        state->fire_timer = 0;
     }
 }
 
@@ -392,8 +397,9 @@ static void tb_gesture_handle_key(tb_gesture_t *state, uint16_t keycode, keyreco
         state->press_timer = timer_read();
         state->x_accum = 0;
         state->y_accum = 0;
+        state->fire_timer = 0;
     } else {
-        tb_gesture_update_hold_state(state);
+        tb_gesture_update_state(state);
         state->pressed = false;
         if (!state->held) {
             tap_code16(keycode);
@@ -401,18 +407,29 @@ static void tb_gesture_handle_key(tb_gesture_t *state, uint16_t keycode, keyreco
         state->held = false;
         state->x_accum = 0;
         state->y_accum = 0;
+        state->fire_timer = 0;
     }
 }
 
 static void tb_gesture_handle_motion(tb_gesture_t *state, report_mouse_t *mouse_report) {
+#if defined(PERMISSIVE_HOLD) || defined(HOLD_ON_OTHER_KEY_PRESS)
+    if (!state->pressed) {
+        return;
+    }
+#else
     if (!state->held) {
         return;
     }
+#endif
 
-    if (mouse_report->x != 0) {
+    bool x_fired = false;
+    if (mouse_report->x != 0 && state->fire_timer == 0) {
         state->x_accum += mouse_report->x;
-        while (state->x_accum >= TB_GESTURE_THRESHOLD || state->x_accum <= -TB_GESTURE_THRESHOLD) {
-            if (state->x_accum > 0) {
+        bool over_x = (state->x_accum >= TB_ACTIVATION_THRESHOLD);
+        bool under_x = (state->x_accum <= -TB_ACTIVATION_THRESHOLD);
+        x_fired = over_x || under_x;
+        if (x_fired) {
+            if (over_x) {
                 if (state->motion_codes.right != KC_NO) {
                     tap_code16(state->motion_codes.right);
                 }
@@ -423,13 +440,18 @@ static void tb_gesture_handle_motion(tb_gesture_t *state, report_mouse_t *mouse_
                 }
                 state->x_accum = 0;
             }
+            state->fire_timer = timer_read();
         }
     }
 
-    if (mouse_report->y != 0) {
+    bool y_fired = false;
+    if (mouse_report->y != 0 && state->fire_timer == 0) {
         state->y_accum += mouse_report->y;
-        while (state->y_accum >= TB_GESTURE_THRESHOLD || state->y_accum <= -TB_GESTURE_THRESHOLD) {
-            if (state->y_accum > 0) {
+        bool over_y = (state->y_accum >= TB_ACTIVATION_THRESHOLD);
+        bool under_y = (state->y_accum <= -TB_ACTIVATION_THRESHOLD);
+        y_fired = over_y || under_y;
+        if (y_fired) {
+            if (over_y) {
                 if (state->motion_codes.backward != KC_NO) {
                     tap_code16(state->motion_codes.backward);
                 }
@@ -440,14 +462,27 @@ static void tb_gesture_handle_motion(tb_gesture_t *state, report_mouse_t *mouse_
                 }
                 state->y_accum = 0;
             }
+            state->fire_timer = timer_read();
         }
     }
+#if defined(PERMISSIVE_HOLD) || defined(HOLD_ON_OTHER_KEY_PRESS)
+    state->held |= (x_fired || y_fired);
+#endif
 
-    // Stop cursor.
+    // Stop cursor based on tap-hold behavior.
+#if defined(PERMISSIVE_HOLD)
+    if (state->held) {
+        mouse_report->x = 0;
+        mouse_report->y = 0;
+        mouse_report->h = 0;
+        mouse_report->v = 0;
+    }
+#else
     mouse_report->x = 0;
     mouse_report->y = 0;
     mouse_report->h = 0;
     mouse_report->v = 0;
+#endif
 }
 
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
@@ -457,14 +492,15 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         mouse_layer_state.active = false;
     }
 
-    tb_gesture_update_hold_state(&esc_tb_gesture);
+    tb_gesture_update_state(&esc_tb_gesture);
     tb_gesture_handle_motion(&esc_tb_gesture, &mouse_report);
-    tb_gesture_update_hold_state(&btn2_tb_gesture);
+    tb_gesture_update_state(&btn2_tb_gesture);
     tb_gesture_handle_motion(&btn2_tb_gesture, &mouse_report);
-    tb_gesture_update_hold_state(&btn3_tb_gesture);
+    tb_gesture_update_state(&btn3_tb_gesture);
     tb_gesture_handle_motion(&btn3_tb_gesture, &mouse_report);
 
-#ifdef TAP_DANCE_ENABLE
+#if defined(TAP_DANCE_ENABLE)
+#if defined(PERMISSIVE_HOLD) || defined(HOLD_ON_OTHER_KEY_PRESS)
     // Interrupt to tap dance for tap/hold
     tap_dance_action_t *tda = &tap_dance_actions[TD_PIPE_MO3];
     tap_dance_state_t *tds = &tda->state;
@@ -474,6 +510,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
             tap_dance_tap_hold_finished(tds, tda->user_data);
         }
     }
+#endif
 #endif
 
     if (user_state.auto_mouse_layer_enabled && !mouse_layer_state.active && mouse_motion_exceeds_threshold(&mouse_report)) {
@@ -673,7 +710,7 @@ void oled_render_layer_misc_info(void) {
     } else {
         oled_write_P(LFSTR_OFF, false);
     }
-    oled_write(format_u3d(user_state.mouse_activation_threshold), false);
+    oled_write(format_u3d(user_state.trackball_activation_threshold), false);
     oled_write_char(' ', false);
 
 #ifdef AUTO_SHIFT_ENABLE
@@ -776,20 +813,20 @@ void keyboard_post_init_user(void) {
 
     esc_tb_gesture.motion_codes.forward = C(KC_C);
     esc_tb_gesture.motion_codes.backward = C(KC_V);
-    esc_tb_gesture.motion_codes.left = S(KC_END);
-    esc_tb_gesture.motion_codes.right = S(KC_HOME);
+    esc_tb_gesture.motion_codes.left = S(KC_HOME);
+    esc_tb_gesture.motion_codes.right = S(KC_END);
 }
 
 void keyball_keyboard_post_init_eeconfig_user(uint32_t raw) {
     user_config_t c = { .raw = raw };
 
-    // c.mouse_activation_threshold * MOUSE_ACTIVATION_THRESHOLD_QU
+    // c.trackball_activation_threshold * MOUSE_ACTIVATION_THRESHOLD_QU
     // is the same as
-    // MOUSE_ACTIVATION_THRESHOLD_MIN + MOUSE_ACTIVATION_THRESHOLD_QU * (c.mouse_activation_threshold - 1)
+    // MOUSE_ACTIVATION_THRESHOLD_MIN + MOUSE_ACTIVATION_THRESHOLD_QU * (c.trackball_activation_threshold - 1)
     // if MOUSE_ACTIVATION_THRESHOLD_MIN === MOUSE_ACTIVATION_THRESHOLD_QU
-    user_state.mouse_activation_threshold = (c.mouse_activation_threshold == 0)
-        ? MOUSE_ACTIVATION_THRESHOLD
-        : c.mouse_activation_threshold * MOUSE_ACTIVATION_THRESHOLD_QU;
+    user_state.trackball_activation_threshold = (c.trackball_activation_threshold == 0)
+        ? TB_ACTIVATION_THRESHOLD
+        : c.trackball_activation_threshold * TB_ACTIVATION_THRESHOLD_QU;
     user_state.auto_mouse_layer_enabled = c.auto_mouse_layer_enabled ? true : false;
 
 #ifdef OLED_ENABLE
@@ -816,9 +853,9 @@ void keyball_keyboard_post_init_eeconfig_user(uint32_t raw) {
 }
 
 void housekeeping_task_user() {
-    tb_gesture_update_hold_state(&btn2_tb_gesture);
-    tb_gesture_update_hold_state(&btn3_tb_gesture);
-    tb_gesture_update_hold_state(&esc_tb_gesture);
+    tb_gesture_update_state(&btn2_tb_gesture);
+    tb_gesture_update_state(&btn3_tb_gesture);
+    tb_gesture_update_state(&esc_tb_gesture);
 
     if (is_keyboard_master()) {
 #ifdef OS_DETECTION_ENABLE
@@ -863,7 +900,7 @@ void housekeeping_task_user() {
 uint32_t keyball_process_record_eeconfig_user(uint32_t raw) {
     user_config_t c = { .raw = raw };
 
-    c.mouse_activation_threshold = user_state.mouse_activation_threshold / MOUSE_ACTIVATION_THRESHOLD_QU;
+    c.trackball_activation_threshold = user_state.trackball_activation_threshold / TB_ACTIVATION_THRESHOLD_QU;
     c.auto_mouse_layer_enabled = user_state.auto_mouse_layer_enabled ? 1 : 0;
 
 #ifdef OLED_ENABLE
@@ -918,16 +955,16 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 oled_invert(user_state.oled_inversion);
                 break;
 #endif
-            case MAT_I5:
+            case TAT_I5:
                 {
-                    uint8_t v = user_state.mouse_activation_threshold + 5;
-                    user_state.mouse_activation_threshold = MIN(v, MOUSE_ACTIVATION_THRESHOLD_MAX);
+                    uint8_t v = user_state.trackball_activation_threshold + 5;
+                    user_state.trackball_activation_threshold = MIN(v, TB_ACTIVATION_THRESHOLD_MAX);
                 }
                 break;
-            case MAT_D5:
+            case TAT_D5:
                 {
-                    uint8_t v = user_state.mouse_activation_threshold - 5;
-                    user_state.mouse_activation_threshold = MAX(v, MOUSE_ACTIVATION_THRESHOLD_MIN);
+                    uint8_t v = user_state.trackball_activation_threshold - 5;
+                    user_state.trackball_activation_threshold = MAX(v, TB_ACTIVATION_THRESHOLD_MIN);
                 }
                 break;
             case AMLY_TGL:
