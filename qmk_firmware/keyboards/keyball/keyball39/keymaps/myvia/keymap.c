@@ -104,21 +104,61 @@ typedef struct {
     } motion_codes;
 } tb_gesture_t;
 
-static tb_gesture_t btn2_tb_gesture = {0};
-static tb_gesture_t btn3_tb_gesture = {0};
-static tb_gesture_t esc_tb_gesture = {0};
+typedef enum {
+    TB_GESTURE_NONE = -1,
+    TB_GESTURE_WS_MOVE = 0,
+    TB_GESTURE_ZOOM,
+    TB_GESTURE_ZOOM_ALT,
+    TB_GESTURE_COPY_PASTE,
+} tb_gesture_id_t;
+
+// Gestures may be overridden by housekeeping_task_user()
+static tb_gesture_t tb_gestures[] = {
+    [TB_GESTURE_WS_MOVE] = {
+        .motion_codes = {
+            .forward  = KC_NO,
+            .backward = KC_NO,
+            .left     = G(KC_PGDN),
+            .right    = G(KC_PGUP),
+        }
+    },
+    [TB_GESTURE_ZOOM] = {
+        .motion_codes = {
+            .forward  = C(JP_PLUS),
+            .backward = C(JP_MINS),
+            .left     = C(KC_0),
+            .right    = C(KC_0),
+        }
+    },
+    [TB_GESTURE_ZOOM_ALT] = {
+        .motion_codes = {
+            .forward  = C(JP_CIRC),
+            .backward = C(JP_MINS),
+            .left     = C(KC_0),
+            .right    = C(KC_0),
+        }
+    },
+    [TB_GESTURE_COPY_PASTE] = {
+        .motion_codes = {
+            .forward  = C(KC_C),
+            .backward = C(KC_V),
+            .left     = S(KC_HOME),
+            .right    = S(KC_END),
+        }
+    },
+};
 
 // clang-format off
 #define KC_TDQUOTS TD(TD_QUOTS)
 #define KC_TDPPTLD TD(TD_TILD_PIPE)
 #define KC_TDPPMO3 TD(TD_PIPE_MO3)
-#define LS_SPC    LSFT_T(KC_SPC)
-#define L3_YEN    LT(3, JP_YEN)
-#define L2_BSPC   LT(2, KC_BSPC)
-#define L1_DEL    LT(1, KC_DEL)
-#define LC_TAB    LCTL_T(KC_TAB)
-#define RS_BSLS   RSFT_T(JP_BSLS)
-#define LS_LGUI   LSFT_T(KC_LGUI)
+#define LS_SPC     LSFT_T(KC_SPC)
+#define L3_YEN     LT(3, JP_YEN)
+#define L2_BSPC    LT(2, KC_BSPC)
+#define L1_DEL     LT(1, KC_DEL)
+#define LC_TAB     LCTL_T(KC_TAB)
+#define RS_BSLS    RSFT_T(JP_BSLS)
+#define LS_LGUI    LSFT_T(KC_LGUI)
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // keymap for default (VIA)
@@ -492,12 +532,12 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         mouse_layer_state.active = false;
     }
 
-    tb_gesture_update_state(&esc_tb_gesture);
-    tb_gesture_handle_motion(&esc_tb_gesture, &mouse_report);
-    tb_gesture_update_state(&btn2_tb_gesture);
-    tb_gesture_handle_motion(&btn2_tb_gesture, &mouse_report);
-    tb_gesture_update_state(&btn3_tb_gesture);
-    tb_gesture_handle_motion(&btn3_tb_gesture, &mouse_report);
+    const size_t tb_gesture_count = sizeof(tb_gestures) / sizeof(tb_gestures[0]);
+    for (size_t i = 0; i < tb_gesture_count; i++) {
+        tb_gesture_t *tbg = &tb_gestures[i];
+        tb_gesture_update_state(tbg);
+        tb_gesture_handle_motion(tbg, &mouse_report);
+    }
 
 #if defined(TAP_DANCE_ENABLE)
 #if defined(PERMISSIVE_HOLD) || defined(HOLD_ON_OTHER_KEY_PRESS)
@@ -799,22 +839,6 @@ void keyboard_post_init_user(void) {
     // turn on OLED on startup.
     oled_on_user(true);
 #endif
-
-    // Gesture w/ KC_BTN2 may be overridden by housekeeping_task_user()
-    btn2_tb_gesture.motion_codes.forward = KC_NO;
-    btn2_tb_gesture.motion_codes.backward = KC_NO;
-    btn2_tb_gesture.motion_codes.left = LGUI(KC_PGDN);
-    btn2_tb_gesture.motion_codes.right = LGUI(KC_PGUP);
-
-    btn3_tb_gesture.motion_codes.forward = C(KC_WH_U);
-    btn3_tb_gesture.motion_codes.backward = C(KC_WH_D);
-    btn3_tb_gesture.motion_codes.left = C(KC_0);
-    btn3_tb_gesture.motion_codes.right = C(KC_0);
-
-    esc_tb_gesture.motion_codes.forward = C(KC_C);
-    esc_tb_gesture.motion_codes.backward = C(KC_V);
-    esc_tb_gesture.motion_codes.left = S(KC_HOME);
-    esc_tb_gesture.motion_codes.right = S(KC_END);
 }
 
 void keyball_keyboard_post_init_eeconfig_user(uint32_t raw) {
@@ -853,12 +877,14 @@ void keyball_keyboard_post_init_eeconfig_user(uint32_t raw) {
 }
 
 void housekeeping_task_user() {
-    tb_gesture_update_state(&btn2_tb_gesture);
-    tb_gesture_update_state(&btn3_tb_gesture);
-    tb_gesture_update_state(&esc_tb_gesture);
+    const size_t tb_gesture_count = sizeof(tb_gestures) / sizeof(tb_gestures[0]);
+    for (size_t i = 0; i < tb_gesture_count; i++) {
+        tb_gesture_update_state(&tb_gestures[i]);
+    }
 
     if (is_keyboard_master()) {
 #ifdef OS_DETECTION_ENABLE
+        // TODO show decteted OS on OLED
         static os_variant_t last_detected_os = OS_UNSURE;
         os_variant_t cur_os = detected_host_os();
         if (cur_os != last_detected_os) {
@@ -870,13 +896,13 @@ void housekeeping_task_user() {
                 case OS_UNSURE:
                     break;
                 case OS_LINUX:
-                    btn2_tb_gesture.motion_codes.left = LGUI(KC_PGDN);
-                    btn2_tb_gesture.motion_codes.right = LGUI(KC_PGUP);
+                    tb_gestures[TB_GESTURE_WS_MOVE].motion_codes.left = G(KC_PGDN);
+                    tb_gestures[TB_GESTURE_WS_MOVE].motion_codes.right = G(KC_PGUP);
                     last_detected_os = cur_os;
                     break;
                 case OS_WINDOWS:
-                    btn2_tb_gesture.motion_codes.left = C(G(KC_LEFT));
-                    btn2_tb_gesture.motion_codes.right = C(G(KC_RIGHT));
+                    tb_gestures[TB_GESTURE_WS_MOVE].motion_codes.left = C(G(KC_LEFT));
+                    tb_gestures[TB_GESTURE_WS_MOVE].motion_codes.right = C(G(KC_RIGHT));
                     last_detected_os = cur_os;
                     break;
                 default:
@@ -922,20 +948,23 @@ uint32_t keyball_process_record_eeconfig_user(uint32_t raw) {
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    tb_gesture_t *tbg = NULL;
+    tb_gesture_id_t tbg_id = TB_GESTURE_NONE;
     switch (keycode) {
         case KC_BTN2:
-            tbg = &btn2_tb_gesture;
+            tbg_id = TB_GESTURE_WS_MOVE;
             break;
-        case KC_BTN3:
-            tbg = &btn3_tb_gesture;
+        case KC_BTN4:
+            tbg_id = TB_GESTURE_ZOOM;
+            break;
+        case KC_BTN5:
+            tbg_id = TB_GESTURE_ZOOM_ALT;
             break;
         case KC_ESC:
-            tbg = &esc_tb_gesture;
+            tbg_id = TB_GESTURE_COPY_PASTE;
             break;
     }
-    if (tbg != NULL) {
-        tb_gesture_handle_key(tbg, keycode, record);
+    if (tbg_id != TB_GESTURE_NONE) {
+        tb_gesture_handle_key(&tb_gestures[tbg_id], keycode, record);
 #ifndef POINTING_DEVICE_AUTO_MOUSE_ENABLE
         handle_mouse_layer(keycode, record);
 #endif
@@ -1001,15 +1030,15 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 const uint16_t PROGMEM jk_lclick_combo[] = {KC_J, KC_K, COMBO_END};
 const uint16_t PROGMEM kl_rclick_combo[] = {KC_K, KC_L, COMBO_END};
 const uint16_t PROGMEM jl_mclick_combo[] = {KC_J, KC_L, COMBO_END};
-const uint16_t PROGMEM mcomm_back_combo[] = {KC_M, KC_COMM, COMBO_END};
-const uint16_t PROGMEM commdot_fwd_combo[] = {KC_COMM, KC_DOT, COMBO_END};
+const uint16_t PROGMEM ui_mclick_combo[] = {KC_U, KC_I, COMBO_END};
+const uint16_t PROGMEM io_mclick_combo[] = {KC_I, KC_O, COMBO_END};
 
 combo_t key_combos[] = {
     COMBO(jk_lclick_combo, KC_BTN1),
     COMBO(kl_rclick_combo, KC_BTN2),
     COMBO(jl_mclick_combo, KC_BTN3),
-    COMBO(mcomm_back_combo, A(KC_LEFT)),
-    COMBO(commdot_fwd_combo, A(KC_RIGHT)),
+    COMBO(ui_mclick_combo, KC_BTN4),
+    COMBO(io_mclick_combo, KC_BTN5),
 };
 
 #endif
