@@ -105,6 +105,7 @@ typedef struct {
 
 static tb_gesture_t btn2_tb_gesture = {0};
 static tb_gesture_t btn3_tb_gesture = {0};
+static tb_gesture_t esc_tb_gesture = {0};
 
 // clang-format off
 #define KC_TDQUOTS TD(TD_QUOTS)
@@ -456,6 +457,8 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
         mouse_layer_state.active = false;
     }
 
+    tb_gesture_update_hold_state(&esc_tb_gesture);
+    tb_gesture_handle_motion(&esc_tb_gesture, &mouse_report);
     tb_gesture_update_hold_state(&btn2_tb_gesture);
     tb_gesture_handle_motion(&btn2_tb_gesture, &mouse_report);
     tb_gesture_update_hold_state(&btn3_tb_gesture);
@@ -760,26 +763,21 @@ void keyboard_post_init_user(void) {
     oled_on_user(true);
 #endif
 
-#ifdef OS_DETECTION_ENABLE
-    if (detected_host_os() == OS_WINDOWS) {
-        btn2_tb_gesture.motion_codes.forward = KC_NO;
-        btn2_tb_gesture.motion_codes.backward = KC_NO;
-        btn2_tb_gesture.motion_codes.left = C(G(KC_LEFT));
-        btn2_tb_gesture.motion_codes.right = C(G(KC_RIGHT));
-    } else {
-#endif
-        btn2_tb_gesture.motion_codes.forward = KC_NO;
-        btn2_tb_gesture.motion_codes.backward = KC_NO;
-        btn2_tb_gesture.motion_codes.left = LGUI(KC_PGDN);
-        btn2_tb_gesture.motion_codes.right = LGUI(KC_PGUP);
-#ifdef OS_DETECTION_ENABLE
-    }
-#endif
+    // Gesture w/ KC_BTN2 may be overridden by housekeeping_task_user()
+    btn2_tb_gesture.motion_codes.forward = KC_NO;
+    btn2_tb_gesture.motion_codes.backward = KC_NO;
+    btn2_tb_gesture.motion_codes.left = LGUI(KC_PGDN);
+    btn2_tb_gesture.motion_codes.right = LGUI(KC_PGUP);
 
-    btn3_tb_gesture.motion_codes.forward = C(JP_CIRC);
-    btn3_tb_gesture.motion_codes.backward = C(JP_MINS);
+    btn3_tb_gesture.motion_codes.forward = C(KC_WH_U);
+    btn3_tb_gesture.motion_codes.backward = C(KC_WH_D);
     btn3_tb_gesture.motion_codes.left = C(KC_0);
     btn3_tb_gesture.motion_codes.right = C(KC_0);
+
+    esc_tb_gesture.motion_codes.forward = C(KC_C);
+    esc_tb_gesture.motion_codes.backward = C(KC_V);
+    esc_tb_gesture.motion_codes.left = S(KC_END);
+    esc_tb_gesture.motion_codes.right = S(KC_HOME);
 }
 
 void keyball_keyboard_post_init_eeconfig_user(uint32_t raw) {
@@ -820,7 +818,36 @@ void keyball_keyboard_post_init_eeconfig_user(uint32_t raw) {
 void housekeeping_task_user() {
     tb_gesture_update_hold_state(&btn2_tb_gesture);
     tb_gesture_update_hold_state(&btn3_tb_gesture);
+    tb_gesture_update_hold_state(&esc_tb_gesture);
+
     if (is_keyboard_master()) {
+#ifdef OS_DETECTION_ENABLE
+        static os_variant_t last_detected_os = OS_UNSURE;
+        os_variant_t cur_os = detected_host_os();
+        if (cur_os != last_detected_os) {
+            // Reassign gesture if detected os changed.
+            last_detected_os = OS_UNSURE;
+        }
+        if (last_detected_os == OS_UNSURE) {
+            switch (cur_os) {
+                case OS_UNSURE:
+                    break;
+                case OS_LINUX:
+                    btn2_tb_gesture.motion_codes.left = LGUI(KC_PGDN);
+                    btn2_tb_gesture.motion_codes.right = LGUI(KC_PGUP);
+                    last_detected_os = cur_os;
+                    break;
+                case OS_WINDOWS:
+                    btn2_tb_gesture.motion_codes.left = C(G(KC_LEFT));
+                    btn2_tb_gesture.motion_codes.right = C(G(KC_RIGHT));
+                    last_detected_os = cur_os;
+                    break;
+                default:
+                    last_detected_os = cur_os;
+                    break;
+            }
+        }
+#endif
 #ifdef OLED_ENABLE
         rpc_set_oled_invert_invoke();
         if (user_state.oled_on) {
@@ -858,14 +885,23 @@ uint32_t keyball_process_record_eeconfig_user(uint32_t raw) {
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    if (keycode == KC_BTN2) {
-        tb_gesture_handle_key(&btn2_tb_gesture, keycode, record);
-        handle_mouse_layer(keycode, record);
-        return false;
+    tb_gesture_t *tbg = NULL;
+    switch (keycode) {
+        case KC_BTN2:
+            tbg = &btn2_tb_gesture;
+            break;
+        case KC_BTN3:
+            tbg = &btn3_tb_gesture;
+            break;
+        case KC_ESC:
+            tbg = &esc_tb_gesture;
+            break;
     }
-    if (keycode == KC_BTN3) {
-        tb_gesture_handle_key(&btn3_tb_gesture, keycode, record);
+    if (tbg != NULL) {
+        tb_gesture_handle_key(tbg, keycode, record);
+#ifndef POINTING_DEVICE_AUTO_MOUSE_ENABLE
         handle_mouse_layer(keycode, record);
+#endif
         return false;
     }
 
