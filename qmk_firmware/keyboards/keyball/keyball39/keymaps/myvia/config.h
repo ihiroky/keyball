@@ -31,18 +31,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Prevent `quantum\keyboard.c` from calling oled_on().
 #define OLED_TIMEOUT 0
-#define KEYBALL_OLED_TIMEOUT 30000
+#define MYVIA_OLED_TIMEOUT 30000
 
 #define TAP_CODE_DELAY 5
 
 // Enable 5 layers for VIA dynamic keymaps.
 #define DYNAMIC_KEYMAP_LAYER_COUNT 5
 
-#define SPLIT_TRANSACTION_IDS_USER KEYBALL_SET_OLED_INVERSION
+#define SPLIT_TRANSACTION_IDS_USER MYVIA_SET_OLED_INVERSION
 
 #undef  OLED_FONT_H
 #undef  OLED_FONT_START
 #undef  OLED_FONT_END
 #define OLED_FONT_H "keyboards/keyball/keyball39/keymaps/myvia/logofont/logofont.c"
 #define OLED_FONT_START 32 // 0x20
-#define OLED_FONT_END 199  // 0xC7
+#define OLED_FONT_END 197  // 0xC5
