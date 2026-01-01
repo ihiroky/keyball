@@ -635,6 +635,24 @@ static const char *format_u3d(uint8_t d) {
 static const char LFSTR_ON[] PROGMEM = "\xB2\xB3";
 static const char LFSTR_OFF[] PROGMEM = "\xB4\xB5";
 
+#ifdef OS_DETECTION_ENABLE
+static char os_variant_initial(os_variant_t os) {
+    switch (os) {
+        case OS_LINUX:
+            return 'L';
+        case OS_WINDOWS:
+            return 'W';
+        case OS_MACOS:
+            return 'M';
+        case OS_IOS:
+            return 'I';
+        case OS_UNSURE:
+        default:
+            return '?';
+    }
+}
+#endif
+
 oled_rotation_t oled_init_user(oled_rotation_t rotation) {
     return !is_keyboard_left() ? OLED_ROTATION_180 : rotation;
 }
@@ -657,6 +675,12 @@ void oled_render_myvia_info(void) {
 #endif
     oled_advance_page(false);
 
+    // trackball-related info
+    oled_write_P(PSTR("Ball\xB1"), false);
+    oled_write_P(PSTR("GI"), false);
+    oled_write(format_u3d((uint8_t)TB_GESTURE_INTERVAL), false);
+    oled_advance_page(false);
+
     // layer-related info (auto mouse + layer report)
     oled_write_P(PSTR("L\xB6\xB7r\xB1"), false);
     oled_write_P(PSTR("\xC2\xC3"), false);
@@ -671,8 +695,10 @@ void oled_render_myvia_info(void) {
     oled_write_P(LFSTR_OFF, false);
     oled_write("---", false);
 #endif
+    oled_write_char('/', false);
+    oled_write_char(MOUSE_LAYER + '0', false);
     oled_write_char(' ', false);
-    oled_write_P(PSTR("\xC6\xC7"), false);
+    oled_write_P(PSTR("LSR"), false);
 #if defined(RAW_ENABLE) && defined(HID_REPORT_ENABLE)
     if (user_state.raw_hid_layer_report_enabled) {
         oled_write_P(LFSTR_ON, false);
@@ -681,6 +707,14 @@ void oled_render_myvia_info(void) {
     }
 #else
     oled_write_P(LFSTR_OFF, false);
+#endif
+
+    oled_advance_page(false);
+    oled_write_P(PSTR("Misc\xB1OS:"), false);
+#ifdef OS_DETECTION_ENABLE
+    oled_write_char(os_variant_initial(detected_host_os()), false);
+#else
+    oled_write_char('?', false);
 #endif
 }
 
@@ -819,7 +853,6 @@ void housekeeping_task_user() {
 
     if (is_keyboard_master()) {
 #ifdef OS_DETECTION_ENABLE
-        // TODO show decteted OS on OLED
         static os_variant_t last_detected_os = OS_UNSURE;
         os_variant_t cur_os = detected_host_os();
         if (cur_os != last_detected_os) {
@@ -911,7 +944,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (record->event.pressed) {
-        // TODO Update oled timer if oled is on.
         switch (keycode) {
 #ifdef OLED_ENABLE
             case OL_TGL:
