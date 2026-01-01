@@ -69,11 +69,17 @@ typedef union {
     };
 } user_config_t;
 
+typedef enum {
+    OLED_OFF = 0,
+    OLED_ON_DEFAULT,
+    OLED_ON_MYVIA_MISC
+} oled_state_t;
+
 typedef struct {
     bool auto_mouse_layer_enabled;
     uint16_t trackball_activation_threshold;
 #ifdef OLED_ENABLE
-    bool oled_on;
+    oled_state_t oled_status;
     uint32_t oled_timer;
     bool oled_inversion;
     bool oled_inversion_changed;
@@ -602,37 +608,10 @@ static void rpc_set_oled_invert_invoke(void) {
         return;
     }
     bool req = user_state.oled_inversion;
-    if (!transaction_rpc_send(KEYBALL_SET_OLED_INVERSION, sizeof(req), &req)) {
+    if (!transaction_rpc_send(MYVIA_SET_OLED_INVERSION, sizeof(req), &req)) {
         return;
     }
     user_state.oled_inversion_changed = false;
-}
-
-static const char *format_4d(int8_t d) {
-    static char buf[5] = {0}; // max width (4) + NUL (1)
-    char        lead   = ' ';
-    if (d < 0) {
-        d    = -d;
-        lead = '-';
-    }
-    buf[3] = (d % 10) + '0';
-    d /= 10;
-    if (d == 0) {
-        buf[2] = lead;
-        lead   = ' ';
-    } else {
-        buf[2] = (d % 10) + '0';
-        d /= 10;
-    }
-    if (d == 0) {
-        buf[1] = lead;
-        lead   = ' ';
-    } else {
-        buf[1] = (d % 10) + '0';
-        d /= 10;
-    }
-    buf[0] = lead;
-    return buf;
 }
 
 static const char *format_u3d(uint8_t d) {
@@ -653,62 +632,15 @@ static const char *format_u3d(uint8_t d) {
     return buf;
 }
 
-static char to_1x(uint8_t x) {
-    x &= 0x0f;
-    return x < 10 ? x + '0' : x + 'a' - 10;
-}
-
-#define BL ((char)0xB0)
 static const char LFSTR_ON[] PROGMEM = "\xB2\xB3";
 static const char LFSTR_OFF[] PROGMEM = "\xB4\xB5";
 
-void oled_render_ball_misc_info(void) {
-    // Format: `Ball:{mouse x}{mouse y}{mouse h}{mouse v}`
-    //
-    // Output example:
-    //
-    //     Ball: -12  34   0   0
+oled_rotation_t oled_init_user(oled_rotation_t rotation) {
+    return is_keyboard_left() ? OLED_ROTATION_180 : rotation;
+}
 
-    // 1st line, "Ball" label, mouse x, y, h, and v.
-    oled_write_P(PSTR("Ball\xB1"), false);
-    oled_write(format_4d(keyball.last_mouse.x), false);
-    oled_write(format_4d(keyball.last_mouse.y), false);
-    oled_write(format_4d(keyball.last_mouse.h), false);
-    oled_write(format_4d(keyball.last_mouse.v), false);
-
-    // 2nd line, empty label and CPI
-    oled_write_P(PSTR("\xBC\xBD"), false);
-    oled_write(format_4d(keyball_get_cpi()) + 1, false);
-    oled_write_P(PSTR("00 "), false);
-
-    // indicate scroll snap mode: "VT" (vertical), "HO" (horizontal), and "SCR" (free)
-#if 1 && KEYBALL_SCROLLSNAP_ENABLE == 2
-    switch (keyball_get_scrollsnap_mode()) {
-        case KEYBALL_SCROLLSNAP_MODE_VERTICAL:
-            oled_write_P(PSTR("VT"), false);
-            break;
-        case KEYBALL_SCROLLSNAP_MODE_HORIZONTAL:
-            oled_write_P(PSTR("HO"), false);
-            break;
-        default:
-            oled_write_P(PSTR("\xBE\xBF"), false);
-            break;
-    }
-#else
-    oled_write_P(PSTR("\xBE\xBF"), false);
-#endif
-    // indicate scroll mode: on/off
-    if (keyball.scroll_mode) {
-        oled_write_P(LFSTR_ON, false);
-    } else {
-        oled_write_P(LFSTR_OFF, false);
-    }
-
-    // indicate scroll divider:
-    oled_write_P(PSTR(" \xC0\xC1"), false);
-    oled_write_char('0' + keyball_get_scroll_div(), false);
-
-    // layer report
+void oled_myvia_info(void) {
+    // layer state report
     oled_write_P(PSTR(" \xC6\xC7"), false);
 #if defined(RAW_ENABLE) && defined(HID_REPORT_ENABLE)
     if (user_state.raw_hid_layer_report_enabled) {
@@ -719,24 +651,24 @@ void oled_render_ball_misc_info(void) {
 #else
     oled_write_P(LFSTR_OFF, false);
 #endif
-}
-
-void oled_render_layer_misc_info(void) {
-    oled_write_char('L', false);
-    for (uint8_t i = 1; i <= 4; i++) {
-        oled_write_char((layer_state_is(i) ? to_1x(i) : BL), false);
-    }
     oled_write_char(' ', false);
 
+    // custom auto mouse layer
     oled_write_P(PSTR("\xC2\xC3"), false);
+#ifndef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     if (user_state.auto_mouse_layer_enabled) {
         oled_write_P(LFSTR_ON, false);
     } else {
         oled_write_P(LFSTR_OFF, false);
     }
     oled_write(format_u3d(user_state.trackball_activation_threshold), false);
+#else
+    oled_write_P(LFSTR_OFF, false);
+    oled_write("---", false);
+#endif
     oled_write_char(' ', false);
 
+    // auto shift
 #ifdef AUTO_SHIFT_ENABLE
     oled_write_P(PSTR("\xC4\xC5"), false);
     if (get_autoshift_state()) {
@@ -752,23 +684,40 @@ void oled_render_layer_misc_info(void) {
 #endif
 }
 
-void oled_on_user(bool on) {
-    if (on && !user_state.oled_on) {
+void oled_set_status(oled_state_t state) {
+    if (state != OLED_OFF && user_state.oled_status == OLED_OFF) {
         oled_on();
-        user_state.oled_on = true;
         user_state.oled_timer = timer_read32();
-    } else {
+    } else if (state == OLED_OFF && user_state.oled_status != OLED_OFF) {
         oled_off();
-        user_state.oled_on = false;
         user_state.oled_timer = 0;
+    }
+    user_state.oled_status = state;
+}
+
+void oled_toggle_status(void) {
+    oled_state_t s = user_state.oled_status;
+    switch (s) {
+        case OLED_OFF:
+            oled_set_status(OLED_ON_DEFAULT);
+            break;
+        case OLED_ON_DEFAULT:
+            oled_set_status(OLED_ON_MYVIA_MISC);
+            break;
+        case OLED_ON_MYVIA_MISC:
+            oled_set_status(OLED_OFF);
+            break;
+        default:
+            oled_set_status(OLED_OFF);
+            break;
     }
 }
 
-bool is_oled_on_user(void) {
-    if (is_keyboard_master()){
-        return user_state.oled_on;
+void oled_reset_timeout(void) {
+    if (user_state.oled_status == OLED_OFF) {
+        return;
     }
-    return is_oled_on();
+    user_state.oled_timer = timer_read32();
 }
 
 void oled_sync_inversion(void) {
@@ -780,25 +729,24 @@ void oled_sync_inversion(void) {
 }
 
 void oledkit_render_info_user(void) {
-    if (!is_oled_on_user()) {
-        return;
+    switch (user_state.oled_status) {
+        case OLED_OFF:
+            break;
+        case OLED_ON_DEFAULT:
+            keyball_oled_render_keyinfo();
+            keyball_oled_render_ballinfo();
+            keyball_oled_render_layerinfo();
+            break;
+        case OLED_ON_MYVIA_MISC:
+            oled_myvia_info();
+            break;
+        default:
+            break;
     }
-    keyball_oled_render_keyinfo();
-#if !defined(RAW_ENABLE) || !defined(HID_REPORT_ENABLE)
-    keyball_oled_render_ballinfo();
-#else
-    oled_render_ball_misc_info();
-#endif
-#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    keyball_oled_render_layerinfo();
-#else
-    oled_render_layer_misc_info();
-#endif
-
 }
 
 void oledkit_render_logo_user(void) {
-    if (!is_oled_on_user()) {
+    if (!is_oled_on()) {
         return;
     }
     oled_sync_inversion();
@@ -818,10 +766,10 @@ void oledkit_render_logo_user(void) {
 
 void keyboard_post_init_user(void) {
 #ifdef OLED_ENABLE
-    transaction_register_rpc(KEYBALL_SET_OLED_INVERSION, rpc_set_oled_invert_handler);
+    transaction_register_rpc(MYVIA_SET_OLED_INVERSION, rpc_set_oled_invert_handler);
 
     // turn on OLED on startup.
-    oled_on_user(true);
+    oled_set_status(OLED_ON_DEFAULT);
 #endif
 }
 
@@ -897,10 +845,10 @@ void housekeeping_task_user() {
 #endif
 #ifdef OLED_ENABLE
         rpc_set_oled_invert_invoke();
-        if (user_state.oled_on) {
-            bool should_oled_on = (timer_elapsed32(user_state.oled_timer) <= KEYBALL_OLED_TIMEOUT);
-            if (!should_oled_on && is_oled_on()) {
-                oled_on_user(false);
+        if (user_state.oled_status != OLED_OFF) {
+            bool should_oled_off = (timer_elapsed32(user_state.oled_timer) > MYVIA_OLED_TIMEOUT);
+            if (should_oled_off && is_oled_on()) {
+                oled_set_status(OLED_OFF);
             }
         }
 #endif
@@ -932,6 +880,10 @@ uint32_t keyball_process_record_eeconfig_user(uint32_t raw) {
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+#ifdef OLED_ENABLE
+    oled_reset_timeout();
+#endif
+
     tb_gesture_id_t tbg_id = TB_GESTURE_NONE;
     switch (keycode) {
         case KC_BTN2:
@@ -960,7 +912,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         switch (keycode) {
 #ifdef OLED_ENABLE
             case OL_TGL:
-                oled_on_user(!user_state.oled_on);
+                oled_toggle_status();
                 break;
             case OL_TGLINV:
                 user_state.oled_inversion = !user_state.oled_inversion;
