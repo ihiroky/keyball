@@ -53,8 +53,6 @@ enum user_keycodes {
 };
 
 enum user_tapdance_keycodes {
-    TD_QUOTS,
-    TD_TILD_PIPE,
     TD_PIPE_MO3,
 };
 
@@ -149,16 +147,15 @@ static tb_gesture_t tb_gestures[] = {
 };
 
 // clang-format off
-#define KC_TDQUOTS TD(TD_QUOTS)
-#define KC_TDPPTLD TD(TD_TILD_PIPE)
-#define KC_TDPPMO3 TD(TD_PIPE_MO3)
-#define LS_SPC     LSFT_T(KC_SPC)
-#define L3_YEN     LT(3, JP_YEN)
-#define L2_BSPC    LT(2, KC_BSPC)
-#define L1_DEL     LT(1, KC_DEL)
-#define LC_TAB     LCTL_T(KC_TAB)
-#define RS_BSLS    RSFT_T(JP_BSLS)
-#define LS_LGUI    LSFT_T(KC_LGUI)
+#define TD_PPMO3    TD(TD_PIPE_MO3)
+#define LS_SPC   LSFT_T(KC_SPC)
+#define L3_YEN   LT(3, JP_YEN)
+#define L2_BSPC  LT(2, KC_BSPC)
+#define L1_DEL   LT(1, KC_DEL)
+#define LC_TAB   LCTL_T(KC_TAB)
+#define RS_BSLS  RSFT_T(JP_BSLS)
+#define LC_CIRC  LCTL_T(JP_CIRC)
+#define LA_AT    LALT_T(JP_AT)
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // keymap for default (VIA)
@@ -166,21 +163,21 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     JP_Q     , JP_W     , JP_E     , JP_R     , JP_T     ,                       JP_Y     , JP_U     , JP_I     , JP_O     , JP_P     ,
     JP_A     , JP_S     , JP_D     , JP_F     , JP_G     ,                       JP_H     , JP_J     , JP_K     , JP_L     , KC_ENTER ,
     JP_Z     , JP_X     , JP_C     , JP_V     , JP_B     ,                       JP_N     , JP_M     , JP_COMM  , JP_DOT   , JP_SLSH  ,
-    KC_ESC   , KC_LALT  , KC_LGUI  ,KC_TDPPMO3, LS_SPC   , L2_BSPC  , L1_DEL  ,  LC_TAB   , _______  , _______  , _______  , RS_BSLS
+    KC_ESC   , KC_LALT  , KC_LGUI  , TD_PPMO3 , LS_SPC   , L2_BSPC  , L1_DEL  ,  LC_TAB   , _______  , _______  , _______  , RS_BSLS
   ),
 
   [1] = LAYOUT_universal(
-    JP_1     , JP_2     , JP_3     , JP_4     , JP_5     ,                       KC_F1    , KC_F2    , KC_F3    , KC_F4    , KC_F5    ,
-    JP_6     , JP_7     , JP_8     , JP_9     , JP_0     ,                       KC_F6    , KC_F7    , KC_F8    , KC_F9    , KC_F10   ,
-    JP_MINS  , JP_EQL   , JP_YEN   , JP_LBRC  , JP_RBRC  ,                      KC_TDQUOTS, KC_F11   , KC_F12   , KC_F13   ,KC_TDPPTLD,
-    JP_SCLN  , JP_QUOT  , JP_GRV   , _______  , LS_LGUI  , _______  , _______  , _______  , _______  , _______  , _______  , _______
+    JP_1     , JP_2     , JP_3     , JP_4     , JP_5     ,                       JP_LBRC  , JP_RBRC  , JP_PERC  , JP_QUOT  , JP_HASH,
+    JP_6     , JP_7     , JP_8     , JP_9     , JP_0     ,                       JP_LCBR  , JP_RCBR  , JP_DLR   , JP_DQUO  , JP_TILD  ,
+    JP_MINS  , JP_PLUS  , JP_ASTR  , JP_EQL   , JP_AMPR  ,                       JP_LPRN  , JP_RPRN  , JP_EXLM  , JP_GRV   , JP_UNDS  ,
+    JP_COLN  , JP_YEN   , _______  , LC_CIRC  , _______  , LA_AT    , _______  , _______  , _______  , _______  , _______  , JP_SCLN
   ),
 
   [2] = LAYOUT_universal(
-    JP_EXLM  , JP_AT    , JP_HASH  , JP_DLR   , JP_PERC  ,                       KC_PSCR  , KC_BRID  , KC_BRIU  , KC_MUTE  , KC_VOLU  ,
-    JP_CIRC  , JP_AMPR  , JP_ASTR  , JP_LPRN  , JP_RPRN  ,                       KC_LEFT  , KC_DOWN  , KC_UP    , KC_RIGHT , KC_VOLD  ,
-    JP_UNDS  , JP_PLUS  , JP_PIPE  , JP_LCBR  , JP_RCBR  ,                       KC_HOME  , KC_PGDN  , KC_PGUP  , KC_END   , KC_F20   ,
-    JP_COLN  , JP_DQUO  , JP_TILD  , _______  , _______  , _______  , KC_RALT  , _______  , _______  , _______  , _______  , _______
+    KC_F1    , KC_F2    , KC_F3    , KC_F4    , KC_F5    ,                       KC_PSCR  , KC_BRID  , KC_BRIU  , KC_F20   , KC_VOLU  ,
+    KC_F6    , KC_F7    , KC_F8    , KC_F9    , KC_F10   ,                       KC_LEFT  , KC_DOWN  , KC_UP    , KC_RIGHT , KC_VOLD  ,
+    KC_F11   , KC_F12   , KC_F13   , KC_F14   , KC_F15   ,                       KC_HOME  , KC_PGDN  , KC_PGUP  , KC_END   , KC_MUTE  ,
+    KC_LGUI  , _______  , _______  , _______  , _______  , _______  , KC_RALT  , _______  , _______  , _______  , _______  , _______
   ),
 
   [3] = LAYOUT_universal(
@@ -192,7 +189,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
   [4] = LAYOUT_universal(
     _______  , _______  , _______  , _______  , _______  ,                       _______  , KC_F3    , KC_F5    , KC_F12   , _______  ,
-    _______  , KC_LSFT  , KC_LCTL  , KC_LALT  , _______  ,                      A(KC_LEFT), KC_BTN1  , KC_BTN3  , KC_BTN2  ,A(KC_RGHT),
+    _______  , KC_LSFT  , KC_LCTL  , KC_LALT  , _______  ,                       KC_BTN4  , KC_BTN1  , KC_BTN3  , KC_BTN2  , KC_BTN5,
     _______  , _______  , _______  , _______  , _______  ,                       KC_LEFT  , KC_DOWN  , KC_UP    , KC_RIGHT , _______  ,
     _______  , _______  , _______  , _______  , _______  , _______  , _______  , TO(0)    , _______  , _______  , _______  , _______
   ),
@@ -257,15 +254,6 @@ typedef struct {
     uint16_t held;
 } tap_dance_tap_hold_t;
 
-static void td_quots_handler(tap_dance_state_t *state, void *user_data) {
-    // 1 tap: ' , 2 taps: " , 3+ taps: `
-    const uint16_t c =
-        (state->count == 1) ? JP_QUOT :
-        (state->count == 2) ? JP_DQUO :
-        JP_GRV;
-    tap_code16(c);
-}
-
 void tap_dance_tap_hold_finished(tap_dance_state_t *state, void *user_data) {
     tap_dance_tap_hold_t *tap_hold = (tap_dance_tap_hold_t *)user_data;
 
@@ -327,8 +315,6 @@ void tap_dance_tap_hold_reset(tap_dance_state_t *state, void *user_data) {
     }
 
 tap_dance_action_t tap_dance_actions[] = {
-    [TD_QUOTS] = ACTION_TAP_DANCE_FN(td_quots_handler),
-    [TD_TILD_PIPE] = ACTION_TAP_DANCE_DOUBLE(JP_TILD, JP_PIPE),
     [TD_PIPE_MO3] =  ACTION_TAP_DANCE_TAP_HOLD(JP_PIPE, MO(3)),
 };
 
@@ -378,8 +364,6 @@ static inline bool is_mouse_layer_key_allowed(keyrecord_t *record) {
         case KC_LALT:
         case KC_WWW_SEARCH ... KC_WWW_FAVORITES:
         case KC_F1 ... KC_F12:
-        case A(KC_RIGHT):
-        case A(KC_LEFT):
             return true;
         default:
             return false;
