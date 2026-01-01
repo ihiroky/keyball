@@ -636,39 +636,12 @@ static const char LFSTR_ON[] PROGMEM = "\xB2\xB3";
 static const char LFSTR_OFF[] PROGMEM = "\xB4\xB5";
 
 oled_rotation_t oled_init_user(oled_rotation_t rotation) {
-    return is_keyboard_left() ? OLED_ROTATION_180 : rotation;
+    return !is_keyboard_left() ? OLED_ROTATION_180 : rotation;
 }
 
-void oled_myvia_info(void) {
-    // layer state report
-    oled_write_P(PSTR(" \xC6\xC7"), false);
-#if defined(RAW_ENABLE) && defined(HID_REPORT_ENABLE)
-    if (user_state.raw_hid_layer_report_enabled) {
-        oled_write_P(LFSTR_ON, false);
-    } else {
-        oled_write_P(LFSTR_OFF, false);
-    }
-#else
-    oled_write_P(LFSTR_OFF, false);
-#endif
-    oled_write_char(' ', false);
-
-    // custom auto mouse layer
-    oled_write_P(PSTR("\xC2\xC3"), false);
-#ifndef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    if (user_state.auto_mouse_layer_enabled) {
-        oled_write_P(LFSTR_ON, false);
-    } else {
-        oled_write_P(LFSTR_OFF, false);
-    }
-    oled_write(format_u3d(user_state.trackball_activation_threshold), false);
-#else
-    oled_write_P(LFSTR_OFF, false);
-    oled_write("---", false);
-#endif
-    oled_write_char(' ', false);
-
-    // auto shift
+void oled_render_myvia_info(void) {
+    // key-related info (auto shift)
+    oled_write_P(PSTR("Key \xB1"), false);
 #ifdef AUTO_SHIFT_ENABLE
     oled_write_P(PSTR("\xC4\xC5"), false);
     if (get_autoshift_state()) {
@@ -682,6 +655,33 @@ void oled_myvia_info(void) {
     oled_write_P(LFSTR_OFF, false);
     oled_write("---", false);
 #endif
+    oled_advance_page(false);
+
+    // layer-related info (auto mouse + layer report)
+    oled_write_P(PSTR("L\xB6\xB7r\xB1"), false);
+    oled_write_P(PSTR("\xC2\xC3"), false);
+#ifndef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    if (user_state.auto_mouse_layer_enabled) {
+        oled_write_P(LFSTR_ON, false);
+    } else {
+        oled_write_P(LFSTR_OFF, false);
+    }
+    oled_write(format_u3d(user_state.trackball_activation_threshold), false);
+#else
+    oled_write_P(LFSTR_OFF, false);
+    oled_write("---", false);
+#endif
+    oled_write_char(' ', false);
+    oled_write_P(PSTR("\xC6\xC7"), false);
+#if defined(RAW_ENABLE) && defined(HID_REPORT_ENABLE)
+    if (user_state.raw_hid_layer_report_enabled) {
+        oled_write_P(LFSTR_ON, false);
+    } else {
+        oled_write_P(LFSTR_OFF, false);
+    }
+#else
+    oled_write_P(LFSTR_OFF, false);
+#endif
 }
 
 void oled_set_status(oled_state_t state) {
@@ -691,6 +691,9 @@ void oled_set_status(oled_state_t state) {
     } else if (state == OLED_OFF && user_state.oled_status != OLED_OFF) {
         oled_off();
         user_state.oled_timer = 0;
+    }
+    if (state == OLED_ON_MYVIA_MISC && user_state.oled_status != OLED_ON_MYVIA_MISC) {
+        oled_clear();
     }
     user_state.oled_status = state;
 }
@@ -738,7 +741,7 @@ void oledkit_render_info_user(void) {
             keyball_oled_render_layerinfo();
             break;
         case OLED_ON_MYVIA_MISC:
-            oled_myvia_info();
+            oled_render_myvia_info();
             break;
         default:
             break;
