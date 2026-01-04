@@ -17,6 +17,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+// TODO User処理使用率のOLED表示
+
 #include QMK_KEYBOARD_H
 
 #include "quantum.h"
@@ -63,9 +65,9 @@ typedef union {
         uint8_t  report_layer_state : 1;
         uint8_t  oled_inversion : 1;
         uint8_t  auto_mouse_layer_enabled : 1;
-        uint16_t trackball_activation_threshold : 5;
+        uint8_t  trackball_activation_threshold : 5;
         uint8_t  autoshift_enabled : 1;
-        uint16_t autoshift_timeout : 5;
+        uint8_t  autoshift_timeout : 5;
     };
 } user_config_t;
 
@@ -77,7 +79,7 @@ typedef enum {
 
 typedef struct {
     bool auto_mouse_layer_enabled;
-    uint16_t trackball_activation_threshold;
+    uint8_t trackball_activation_threshold;
 #ifdef OLED_ENABLE
     oled_state_t oled_status;
     uint32_t oled_timer;
@@ -452,11 +454,13 @@ static void tb_gesture_handle_motion(tb_gesture_t *state, report_mouse_t *mouse_
     }
 #endif
 
+    int16_t threshold = (int16_t)user_state.trackball_activation_threshold;
+
     bool x_fired = false;
     if (mouse_report->x != 0 && state->fire_timer == 0) {
         state->x_accum += mouse_report->x;
-        bool over_x = (state->x_accum >= TB_ACTIVATION_THRESHOLD);
-        bool under_x = (state->x_accum <= -TB_ACTIVATION_THRESHOLD);
+        bool over_x = (state->x_accum >= threshold);
+        bool under_x = (state->x_accum <= -threshold);
         x_fired = over_x || under_x;
         if (x_fired) {
             if (over_x) {
@@ -477,8 +481,8 @@ static void tb_gesture_handle_motion(tb_gesture_t *state, report_mouse_t *mouse_
     bool y_fired = false;
     if (mouse_report->y != 0 && state->fire_timer == 0) {
         state->y_accum += mouse_report->y;
-        bool over_y = (state->y_accum >= TB_ACTIVATION_THRESHOLD);
-        bool under_y = (state->y_accum <= -TB_ACTIVATION_THRESHOLD);
+        bool over_y = (state->y_accum >= threshold);
+        bool under_y = (state->y_accum <= -threshold);
         y_fired = over_y || under_y;
         if (y_fired) {
             if (over_y) {
@@ -607,6 +611,9 @@ static void rpc_set_oled_invert_invoke(void) {
     if (!user_state.oled_inversion_changed) {
         return;
     }
+
+    // TODO: Retry if failed
+
     bool req = user_state.oled_inversion;
     if (!transaction_rpc_send(MYVIA_SET_OLED_INVERSION, sizeof(req), &req)) {
         return;
@@ -690,6 +697,7 @@ void oled_render_myvia_info(void) {
     } else {
         oled_write_P(LFSTR_OFF, false);
     }
+    // TODO: This threshold should be shown in ball info section
     oled_write(format_u3d(user_state.trackball_activation_threshold), false);
 #else
     oled_write_P(LFSTR_OFF, false);
@@ -998,18 +1006,18 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 #ifdef COMBO_ENABLE
 
-const uint16_t PROGMEM jk_lclick_combo[] = {KC_J, KC_K, COMBO_END};
-const uint16_t PROGMEM kl_rclick_combo[] = {KC_K, KC_L, COMBO_END};
-const uint16_t PROGMEM jl_mclick_combo[] = {KC_J, KC_L, COMBO_END};
-const uint16_t PROGMEM ui_mclick_combo[] = {KC_U, KC_I, COMBO_END};
-const uint16_t PROGMEM io_mclick_combo[] = {KC_I, KC_O, COMBO_END};
+const uint16_t PROGMEM left_click_combo[] = {KC_J, KC_K, COMBO_END};
+const uint16_t PROGMEM right_click_combo[] = {KC_K, KC_L, COMBO_END};
+const uint16_t PROGMEM middle_click_combo[] = {KC_J, KC_L, COMBO_END};
+const uint16_t PROGMEM backward_combo[] = {KC_U, KC_I, COMBO_END};
+const uint16_t PROGMEM forward_combo[] = {KC_I, KC_O, COMBO_END};
 
 combo_t key_combos[] = {
-    COMBO(jk_lclick_combo, KC_BTN1),
-    COMBO(kl_rclick_combo, KC_BTN2),
-    COMBO(jl_mclick_combo, KC_BTN3),
-    COMBO(ui_mclick_combo, KC_BTN4),
-    COMBO(io_mclick_combo, KC_BTN5),
+    COMBO(left_click_combo, KC_BTN1),
+    COMBO(right_click_combo, KC_BTN2),
+    COMBO(middle_click_combo, KC_BTN3),
+    COMBO(backward_combo, KC_BTN4),
+    COMBO(forward_combo, KC_BTN5),
 };
 
 #endif

@@ -113,7 +113,7 @@ const unsigned char font[] PROGMEM = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0x7F
 
   ///////////////////////////////////////////////////////////////////////////
-  // Keyball logo
+  // Keyball logo TODO: place adjustment for better appearance
 
   // Logo 1/3 (0x80 ~ 0x8F)
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
