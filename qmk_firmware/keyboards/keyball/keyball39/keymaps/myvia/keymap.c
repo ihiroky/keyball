@@ -175,9 +175,9 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   ),
 
   [1] = LAYOUT_universal(
-    JP_1     , JP_2     , JP_3     , JP_4     , JP_5     ,                       JP_LBRC  , JP_RBRC  , JP_PERC  , JP_QUOT  , JP_HASH,
-    JP_6     , JP_7     , JP_8     , JP_9     , JP_0     ,                       JP_LCBR  , JP_RCBR  , JP_DLR   , JP_DQUO  , JP_TILD  ,
-    JP_MINS  , JP_PLUS  , JP_ASTR  , JP_EQL   , JP_AMPR  ,                       JP_LPRN  , JP_RPRN  , JP_EXLM  , JP_GRV   , JP_UNDS  ,
+    JP_PLUS  , JP_7     , JP_8     , JP_9     , JP_ASTR  ,                       JP_QUOT  , JP_LBRC  , JP_RBRC  , JP_DLR   , JP_HASH  ,
+    JP_MINS  , JP_4     , JP_5     , JP_6     , JP_0     ,                       JP_DQUO  , JP_LPRN  , JP_RPRN  , JP_AMPR  , JP_TILD  ,
+    JP_EQL   , JP_1     , JP_2     , JP_3     , JP_PERC  ,                       JP_GRV   , JP_LCBR  , JP_RCBR  , JP_EXLM  , JP_UNDS  ,
     JP_COLN  , JP_YEN   , _______  , LC_CIRC  , _______  , LA_AT    , _______  , _______  , _______  , _______  , _______  , JP_SCLN
   ),
 
