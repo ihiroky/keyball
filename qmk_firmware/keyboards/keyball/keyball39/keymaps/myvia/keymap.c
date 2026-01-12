@@ -189,9 +189,9 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   ),
 
   [3] = LAYOUT_universal(
-    AML_TO   , SCRL_TO  , CPI_I100 , SSNP_VRT , DB_TOGG  ,                       QK_MAKE  , AMLY_TGL , AS_TOGG  , _______  , QK_RBT   ,
-    AML_I50  , SCRL_MO  , CPI_D100 , SSNP_HOR , KBC_RST  ,                       OL_TGL   , TAT_I5   , AS_UP    , _______  , _______  ,
-    AML_D50  , SCRL_DVI , CPI_I1K  , SSNP_FRE , KBC_SAVE ,                       OL_TGLINV, TAT_D5   , AS_DOWN  , RT_LY_TGL, JP_ZKHK  ,
+    AML_TO   , SCRL_TO  , CPI_I100 , SSNP_VRT , DB_TOGG  ,                       QK_MAKE  , AMLY_TGL , _______  , _______  , QK_RBT   ,
+    AML_I50  , SCRL_MO  , CPI_D100 , SSNP_HOR , KBC_RST  ,                       OL_TGL   , TAT_I5   , _______  , _______  , _______  ,
+    AML_D50  , SCRL_DVI , CPI_I1K  , SSNP_FRE , KBC_SAVE ,                       OL_TGLINV, TAT_D5   , _______  , RT_LY_TGL, JP_ZKHK  ,
     _______  , SCRL_DVD , CPI_D1K  , _______  , QK_BOOT  , EE_CLR   , JP_HENK  , JP_MHEN  , _______  , _______  , _______  , _______
   ),
 
