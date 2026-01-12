@@ -612,8 +612,6 @@ static void rpc_set_oled_invert_invoke(void) {
         return;
     }
 
-    // TODO: Retry if failed
-
     bool req = user_state.oled_inversion;
     if (!transaction_rpc_send(MYVIA_SET_OLED_INVERSION, sizeof(req), &req)) {
         return;
@@ -678,35 +676,29 @@ void oled_render_myvia_info(void) {
 #else
     oled_write_P(PSTR("\xC4\xC5"), false);
     oled_write_P(LFSTR_OFF, false);
-    oled_write("---", false);
 #endif
     oled_advance_page(false);
 
     // trackball-related info
-    oled_write_P(PSTR("Ball\xB1"), false);
-    oled_write_P(PSTR("GI"), false);
+    oled_write_P(PSTR("Ball\xB1\xC8\xC9"), false);
     oled_write(format_u3d((uint8_t)TB_GESTURE_INTERVAL), false);
+    oled_write_P(PSTR(" \xC6\xC7"), false); // " GI"
+    oled_write(format_u3d(user_state.trackball_activation_threshold), false);
     oled_advance_page(false);
 
     // layer-related info (auto mouse + layer report)
     oled_write_P(PSTR("L\xB6\xB7r\xB1"), false);
-    oled_write_P(PSTR("\xC2\xC3"), false);
+    oled_write_P(PSTR("\xC2\xC3"), false); // "AML"
 #ifndef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     if (user_state.auto_mouse_layer_enabled) {
         oled_write_P(LFSTR_ON, false);
     } else {
         oled_write_P(LFSTR_OFF, false);
     }
-    // TODO: This threshold should be shown in ball info section
-    oled_write(format_u3d(user_state.trackball_activation_threshold), false);
-#else
-    oled_write_P(LFSTR_OFF, false);
-    oled_write("---", false);
 #endif
     oled_write_char('/', false);
     oled_write_char(MOUSE_LAYER + '0', false);
-    oled_write_char(' ', false);
-    oled_write_P(PSTR("LSR"), false);
+    oled_write_P(PSTR(" \xCA\xCB"), false); // " LSR"
 #if defined(RAW_ENABLE) && defined(HID_REPORT_ENABLE)
     if (user_state.raw_hid_layer_report_enabled) {
         oled_write_P(LFSTR_ON, false);
@@ -718,7 +710,7 @@ void oled_render_myvia_info(void) {
 #endif
 
     oled_advance_page(false);
-    oled_write_P(PSTR("Misc\xB1OS:"), false);
+    oled_write_P(PSTR("Misc\xB1\xCC\xCD:"), false); // "Misc|OS:"
 #ifdef OS_DETECTION_ENABLE
     oled_write_char(os_variant_initial(detected_host_os()), false);
 #else
