@@ -637,6 +637,30 @@ static const char *format_u3d(uint8_t d) {
     return buf;
 }
 
+static const char *format_u4d(uint16_t d) {
+    static char buf[5] = {0}; // max width (4) + NUL (1)
+    buf[3] = (d % 10) + '0';
+    d /= 10;
+    if (d == 0) {
+        buf[2] = ' ';
+    } else {
+        buf[2] = (d % 10) + '0';
+        d /= 10;
+    }
+    if (d == 0) {
+        buf[1] = ' ';
+    } else {
+        buf[1] = (d % 10) + '0';
+        d /= 10;
+    }
+    if (d == 0) {
+        buf[0] = ' ';
+    } else {
+        buf[0] = (d % 10) + '0';
+    }
+    return buf;
+}
+
 static const char LFSTR_ON[] PROGMEM = "\xB2\xB3";
 static const char LFSTR_OFF[] PROGMEM = "\xB4\xB5";
 
@@ -677,6 +701,9 @@ void oled_render_myvia_info(void) {
     oled_write_P(PSTR("\xC4\xC5"), false);
     oled_write_P(LFSTR_OFF, false);
 #endif
+    oled_write_P(PSTR(" \xCE\xCF"), false); // " MSR"
+    uint16_t msr = MIN(get_matrix_scan_rate(), 9999);
+    oled_write(format_u4d((uint16_t)msr), false);
     oled_advance_page(false);
 
     // trackball-related info
