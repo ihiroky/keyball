@@ -21,11 +21,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
 #define TAPPING_TERM 175
-#define AUTO_SHIFT_TIMEOUT 150
-#define AUTO_SHIFT_REPEAT
 #define NO_ACTION_ONESHOT
 // #define PERMISSIVE_HOLD
 #define HOLD_ON_OTHER_KEY_PRESS
+#define ENABLE_COMPILE_KEYCODE
 
 #define HID_REPORT_ENABLE
 
