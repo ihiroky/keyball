@@ -159,8 +159,8 @@ static tb_gesture_t tb_gestures[] = {
 #define LS_SPC   LSFT_T(KC_SPC)
 #define L3_YEN   LT(3, JP_YEN)
 #define L2_BSPC  LT(2, KC_BSPC)
-#define L1_DEL   LT(1, KC_DEL)
-#define LC_TAB   LCTL_T(KC_TAB)
+#define L1_TAB   LT(1, KC_TAB)
+#define LC_DEL   LCTL_T(KC_DEL)
 #define RS_BSLS  RSFT_T(JP_BSLS)
 #define LC_CIRC  LCTL_T(JP_CIRC)
 #define LA_AT    LALT_T(JP_AT)
@@ -171,7 +171,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     JP_Q     , JP_W     , JP_E     , JP_R     , JP_T     ,                       JP_Y     , JP_U     , JP_I     , JP_O     , JP_P     ,
     JP_A     , JP_S     , JP_D     , JP_F     , JP_G     ,                       JP_H     , JP_J     , JP_K     , JP_L     , KC_ENTER ,
     JP_Z     , JP_X     , JP_C     , JP_V     , JP_B     ,                       JP_N     , JP_M     , JP_COMM  , JP_DOT   , JP_SLSH  ,
-    KC_ESC   , KC_LALT  , KC_LGUI  , TD_PPMO3 , LS_SPC   , L2_BSPC  , L1_DEL  ,  LC_TAB   , _______  , _______  , _______  , RS_BSLS
+    KC_ESC   , KC_LALT  , KC_LGUI  , TD_PPMO3 , LS_SPC   , L2_BSPC  , LC_DEL  ,  L1_TAB   , _______  , _______  , _______  , RS_BSLS
   ),
 
   [1] = LAYOUT_universal(
@@ -185,11 +185,11 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     KC_F1    , KC_F2    , KC_F3    , KC_F4    , KC_F5    ,                       KC_PSCR  , KC_BRID  , KC_BRIU  , KC_F20   , KC_VOLU  ,
     KC_F6    , KC_F7    , KC_F8    , KC_F9    , KC_F10   ,                       KC_LEFT  , KC_DOWN  , KC_UP    , KC_RIGHT , KC_VOLD  ,
     KC_F11   , KC_F12   , KC_F13   , KC_F14   , KC_F15   ,                       KC_HOME  , KC_PGDN  , KC_PGUP  , KC_END   , KC_MUTE  ,
-    KC_LGUI  , _______  , _______  , _______  , _______  , _______  , KC_RALT  , _______  , _______  , _______  , _______  , _______
+    KC_LGUI  , _______  , _______  , _______  , _______  , _______  , _______  , KC_RALT  , _______  , _______  , _______  , _______
   ),
 
   [3] = LAYOUT_universal(
-    AML_TO   , SCRL_TO  , CPI_I100 , SSNP_VRT , _______  ,                       QK_MAKE  , AMLY_TGL , AS_TOGG  , _______  , QK_RBT   ,
+    AML_TO   , SCRL_TO  , CPI_I100 , SSNP_VRT , DB_TOGG  ,                       QK_MAKE  , AMLY_TGL , AS_TOGG  , _______  , QK_RBT   ,
     AML_I50  , SCRL_MO  , CPI_D100 , SSNP_HOR , KBC_RST  ,                       OL_TGL   , TAT_I5   , AS_UP    , _______  , _______  ,
     AML_D50  , SCRL_DVI , CPI_I1K  , SSNP_FRE , KBC_SAVE ,                       OL_TGLINV, TAT_D5   , AS_DOWN  , RT_LY_TGL, JP_ZKHK  ,
     _______  , SCRL_DVD , CPI_D1K  , _______  , QK_BOOT  , EE_CLR   , JP_HENK  , JP_MHEN  , _______  , _______  , _______  , _______
@@ -1009,8 +1009,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 const uint16_t PROGMEM left_click_combo[] = {KC_J, KC_K, COMBO_END};
 const uint16_t PROGMEM right_click_combo[] = {KC_K, KC_L, COMBO_END};
 const uint16_t PROGMEM middle_click_combo[] = {KC_J, KC_L, COMBO_END};
-const uint16_t PROGMEM backward_combo[] = {KC_U, KC_I, COMBO_END};
-const uint16_t PROGMEM forward_combo[] = {KC_I, KC_O, COMBO_END};
+const uint16_t PROGMEM backward_combo[] = {KC_M, KC_COMMA, COMBO_END};
+const uint16_t PROGMEM forward_combo[] = {KC_COMMA, KC_DOT, COMBO_END};
 
 combo_t key_combos[] = {
     COMBO(left_click_combo, KC_BTN1),
