@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // #define PERMISSIVE_HOLD
 #define HOLD_ON_OTHER_KEY_PRESS
 #define ENABLE_COMPILE_KEYCODE
+#define DEBUG_MATRIX_SCAN_RATE
 
 #define HID_REPORT_ENABLE
 
@@ -44,4 +45,4 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #undef  OLED_FONT_END
 #define OLED_FONT_H "keyboards/keyball/keyball39/keymaps/myvia/logofont/logofont.c"
 #define OLED_FONT_START 32 // 0x20
-#define OLED_FONT_END 197  // 0xC5
+#define OLED_FONT_END 207  // 0xCF
