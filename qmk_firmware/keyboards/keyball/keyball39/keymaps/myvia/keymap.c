@@ -155,12 +155,14 @@ static tb_gesture_t tb_gestures[] = {
 };
 
 // clang-format off
-#define TD_PPMO3    TD(TD_PIPE_MO3)
+#define TD_PPMO3 TD(TD_PIPE_MO3)
+#define LC_ESC   LCTL_T(KC_ESC)
 #define LS_SPC   LSFT_T(KC_SPC)
+#define L4_ENTER LT(4, KC_ENTER)
 #define L3_YEN   LT(3, JP_YEN)
 #define L2_BSPC  LT(2, KC_BSPC)
 #define L1_TAB   LT(1, KC_TAB)
-#define LC_DEL   LCTL_T(KC_DEL)
+#define RC_DEL   RCTL_T(KC_DEL)
 #define RS_BSLS  RSFT_T(JP_BSLS)
 #define LC_CIRC  LCTL_T(JP_CIRC)
 #define LA_AT    LALT_T(JP_AT)
@@ -169,9 +171,9 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // keymap for default (VIA)
   [0] = LAYOUT_universal(
     JP_Q     , JP_W     , JP_E     , JP_R     , JP_T     ,                       JP_Y     , JP_U     , JP_I     , JP_O     , JP_P     ,
-    JP_A     , JP_S     , JP_D     , JP_F     , JP_G     ,                       JP_H     , JP_J     , JP_K     , JP_L     , KC_ENTER ,
+    JP_A     , JP_S     , JP_D     , JP_F     , JP_G     ,                       JP_H     , JP_J     , JP_K     , JP_L     , L4_ENTER ,
     JP_Z     , JP_X     , JP_C     , JP_V     , JP_B     ,                       JP_N     , JP_M     , JP_COMM  , JP_DOT   , JP_SLSH  ,
-    KC_ESC   , KC_LALT  , KC_LGUI  , TD_PPMO3 , LS_SPC   , L2_BSPC  , LC_DEL  ,  L1_TAB   , _______  , _______  , _______  , RS_BSLS
+    LC_ESC   , KC_LALT  , KC_LGUI  , TD_PPMO3 , LS_SPC   , L2_BSPC  , RC_DEL  ,  L1_TAB   , _______  , _______  , _______  , RS_BSLS
   ),
 
   [1] = LAYOUT_universal(
@@ -196,9 +198,9 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   ),
 
   [4] = LAYOUT_universal(
-    _______  , _______  , _______  , _______  , _______  ,                       _______  , KC_F3    , KC_F5    , KC_F12   , _______  ,
-    _______  , KC_LSFT  , KC_LCTL  , KC_LALT  , _______  ,                       KC_BTN4  , KC_BTN1  , KC_BTN3  , KC_BTN2  , KC_BTN5,
-    _______  , _______  , _______  , _______  , _______  ,                       KC_LEFT  , KC_DOWN  , KC_UP    , KC_RIGHT , _______  ,
+    _______  , _______  , KC_LSFT  , KC_RSFT  , _______  ,                       _______  , KC_F3    , KC_F5    , KC_F12   , _______  ,
+    _______  , _______  , KC_LCTL  , KC_RCTL  , _______  ,                       _______  , KC_BTN1  , KC_BTN3  , KC_BTN2  , _______  ,
+    _______  , _______  , KC_LALT  , KC_RALT  , _______  ,                       _______  , KC_BTN4  , _______  , KC_BTN5  , _______  ,
     _______  , _______  , _______  , _______  , _______  , _______  , _______  , TO(0)    , _______  , _______  , _______  , _______
   ),
 };
@@ -958,7 +960,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case KC_BTN5:
             tbg_id = TB_GESTURE_ZOOM_ALT;
             break;
-        case KC_ESC:
+        case JP_COMM:
             tbg_id = TB_GESTURE_COPY_PASTE;
             break;
     }
